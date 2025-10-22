@@ -699,12 +699,51 @@ static ASTNode *compound_stmt(Token **rest, Token *tok) {
                 var->is_extern = spec->is_extern;
                 
                 if (equal(tok, "=")) {
-                    ASTNode *lhs = new_node(ND_VAR);
-                    lhs->var = var;
-                    ASTNode *rhs = assign(&tok, tok->next);
-                    ASTNode *node = new_binary(ND_ASSIGN, lhs, rhs);
-                    cur = cur->next = new_node(ND_EXPR_STMT);
-                    cur->lhs = node;
+                    tok = tok->next;
+                    
+                    /* Parse initializer */
+                    Initializer *init = parse_initializer(&tok, tok, ty);
+                    var->init = init;
+                    
+                    /* Generate assignment code for the initializer */
+                    if (ty->kind == TY_ARRAY) {
+                        /* Handle array initialization */
+                        int idx = 0;
+                        for (Initializer *i = init->children; i; i = i->next) {
+                            /* Create: var[idx] = value */
+                            ASTNode *lhs = new_node(ND_VAR);
+                            lhs->var = var;
+                            
+                            /* For arrays, we need to get the address and add offset */
+                            /* Create: &var */
+                            ASTNode *addr = new_node(ND_ADDR);
+                            addr->lhs = lhs;
+                            
+                            /* Create index (unscaled - ADD will handle scaling) */
+                            ASTNode *index = new_num(idx);
+                            
+                            /* Create array access: &var + idx */
+                            ASTNode *ptr = new_binary(ND_ADD, addr, index);
+                            
+                            /* Dereference to get array element */
+                            ASTNode *elem = new_node(ND_DEREF);
+                            elem->lhs = ptr;
+                            
+                            /* Assign value */
+                            ASTNode *assign_node = new_binary(ND_ASSIGN, elem, i->expr);
+                            cur = cur->next = new_node(ND_EXPR_STMT);
+                            cur->lhs = assign_node;
+                            
+                            idx++;
+                        }
+                    } else if (init->is_expr) {
+                        /* Simple assignment */
+                        ASTNode *lhs = new_node(ND_VAR);
+                        lhs->var = var;
+                        ASTNode *node = new_binary(ND_ASSIGN, lhs, init->expr);
+                        cur = cur->next = new_node(ND_EXPR_STMT);
+                        cur->lhs = node;
+                    }
                 }
             }
             tok = skip(tok, ";");
@@ -718,6 +757,107 @@ static ASTNode *compound_stmt(Token **rest, Token *tok) {
     node->body = head.next;
     *rest = tok->next;
     return node;
+}
+
+/* Create a new initializer */
+static Initializer *new_initializer(Type *ty) {
+    Initializer *init = calloc(1, sizeof(Initializer));
+    init->ty = ty;
+    return init;
+}
+
+/* Parse initializer */
+Initializer *parse_initializer(Token **rest, Token *tok, Type *ty) {
+    Initializer *init = new_initializer(ty);
+    
+    /* Handle brace initializer */
+    if (equal(tok, "{")) {
+        tok = tok->next;
+        
+        /* Check for zero initializer: {0} */
+        bool is_zero_init = false;
+        if (tok->kind == TK_NUM && tok->val == 0) {
+            Token *next = tok->next;
+            if (equal(next, "}")) {
+                is_zero_init = true;
+                tok = next;
+            }
+        }
+        
+        if (is_zero_init) {
+            /* Zero initializer - all elements/fields set to 0 */
+            /* For now, we don't generate any initialization code */
+            /* Local variables are already zeroed by the stack allocation */
+            *rest = skip(tok, "}");
+            return init;
+        }
+        
+        /* Handle array type */
+        if (ty->kind == TY_ARRAY) {
+            int i = 0;
+            Initializer *cur = NULL;
+            
+            while (!equal(tok, "}")) {
+                if (i > 0) {
+                    tok = skip(tok, ",");
+                    if (equal(tok, "}")) break;  /* Allow trailing comma */
+                }
+                
+                /* Parse element initializer */
+                Initializer *elem = parse_initializer(&tok, tok, ty->base);
+                elem->index = i;
+                
+                if (cur) {
+                    cur->next = elem;
+                } else {
+                    init->children = elem;
+                }
+                cur = elem;
+                i++;
+            }
+            *rest = skip(tok, "}");
+            return init;
+        }
+        
+        /* Handle struct type - for now, treat like array */
+        /* TODO: Implement proper struct member initialization */
+        if (ty->kind == TY_STRUCT || ty->kind == TY_INT || ty->kind == TY_CHAR || ty->kind == TY_PTR) {
+            /* For simple types, just parse a list of values */
+            Initializer *cur = NULL;
+            int i = 0;
+            
+            while (!equal(tok, "}")) {
+                if (i > 0) {
+                    tok = skip(tok, ",");
+                    if (equal(tok, "}")) break;
+                }
+                
+                /* For struct/simple types, parse as expression */
+                ASTNode *expr_node = assign(&tok, tok);
+                Initializer *elem = new_initializer(ty);
+                elem->is_expr = true;
+                elem->expr = expr_node;
+                elem->index = i;
+                
+                if (cur) {
+                    cur->next = elem;
+                } else {
+                    init->children = elem;
+                }
+                cur = elem;
+                i++;
+            }
+            *rest = skip(tok, "}");
+            return init;
+        }
+        
+        error_tok(tok, "unsupported initializer type");
+    }
+    
+    /* Simple expression initializer */
+    init->is_expr = true;
+    init->expr = assign(rest, tok);
+    return init;
 }
 
 /* Parse type specifier */

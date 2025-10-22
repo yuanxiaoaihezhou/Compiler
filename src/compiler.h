@@ -15,6 +15,7 @@ typedef struct ASTNode ASTNode;
 typedef struct Type Type;
 typedef struct Symbol Symbol;
 typedef struct IR IR;
+typedef struct Initializer Initializer;
 
 /* Token types for lexical analysis */
 typedef enum {
@@ -137,6 +138,17 @@ struct ASTNode {
     char *cont_label;    /* Continue label for loop */
 };
 
+/* Initializer for variables */
+typedef struct Initializer Initializer;
+struct Initializer {
+    Initializer *next;
+    Type *ty;          /* Type being initialized */
+    bool is_expr;      /* True if single expression, false if nested */
+    ASTNode *expr;     /* Single expression initializer */
+    Initializer *children; /* For array/struct initializers */
+    int index;         /* Array index or struct member index */
+};
+
 /* Symbol (variable/function) */
 struct Symbol {
     Symbol *next;
@@ -154,6 +166,7 @@ struct Symbol {
     bool is_extern;    /* External linkage */
     int enum_val;      /* For enum constants */
     bool is_variadic;  /* Is this a variadic function? */
+    Initializer *init; /* Variable initializer */
 };
 
 /* Intermediate representation */
@@ -193,6 +206,7 @@ Token *tokenize_file(char *filename);
 /* Parser functions */
 Symbol *parse(Token *tok);
 Type *copy_type(Type *ty);
+Initializer *parse_initializer(Token **rest, Token *tok, Type *ty);
 
 /* AST functions */
 ASTNode *new_node(NodeKind kind);
