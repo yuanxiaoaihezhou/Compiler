@@ -124,19 +124,22 @@ make test
 编译器提供了多个自举测试选项：
 
 ```bash
-# 基础自举测试 - 验证编译器能编译简单程序
+# 基础自举测试 - 验证编译器能编译简单程序 (✓ 工作正常)
 make bootstrap
 
-# 阶段1自举 - 尝试用GCC编译的编译器来编译自己
+# 阶段1自举 (模块化) - 分别编译各源文件 (✗ 当前不可用 - 缺少结构体成员访问支持)
+make bootstrap-stage1-modular
+
+# 阶段1自举 (合并) - 使用合并源文件 (⚠️ 部分工作 - 仍需结构体支持)
 make bootstrap-stage1
 
-# 阶段2自举 - 用阶段1编译器编译自己
+# 阶段2自举 - 用阶段1编译器编译自己 (需要阶段1成功)
 make bootstrap-stage2
 
-# 完整自举 - 3阶段验证，确认阶段1和阶段2生成相同结果
+# 完整自举 - 3阶段验证 (需要阶段1和2成功)
 make bootstrap-full
 
-# 自举测试 - 用自举编译器运行所有测试
+# 自举测试 - 用自举编译器运行所有测试 (需要阶段1成功)
 make bootstrap-test
 ```
 
@@ -146,7 +149,14 @@ make bootstrap-test
 3. 阶段2：使用mycc-stage1编译自己（mycc-stage2）
 4. 验证：确认mycc-stage1和mycc-stage2生成相同的输出
 
-**当前状态**：基础自举测试通过，已实现typedef/enum/static/extern/const/switch/variadic等关键特性。完整自举还需要实现大括号初始化器等特性。详见`docs/SELF_HOSTING.md`。
+**当前状态**：
+- ✓ 基础自举测试通过 - 编译器能编译和运行简单的C程序
+- ✓ 已实现typedef/enum/static/extern/const/switch/variadic等关键特性  
+- ✗ **结构体成员访问未实现** - parser能解析但IR和代码生成不支持，导致任何使用结构体成员的代码都会崩溃
+- ✗ 模块化自举被阻止 - 编译器自身源代码大量使用结构体（Symbol, ASTNode, Type, CompilerState等）
+- ⚠️ 完整自举还需要实现结构体成员访问和大括号初始化器等特性
+
+详见`docs/SELF_HOSTING.md`了解完整自举状态和所需功能。
 
 ## 技术文档
 
