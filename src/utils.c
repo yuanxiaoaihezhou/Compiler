@@ -62,3 +62,13 @@ char *strndup_custom(const char *s, size_t n) {
     }
     return new;
 }
+
+/* Full string duplication */
+char *strdup_custom(const char *s) {
+    size_t len = strlen(s);
+    char *new = malloc(len + 1);
+    if (new) {
+        memcpy(new, s, len + 1);
+    }
+    return new;
+}

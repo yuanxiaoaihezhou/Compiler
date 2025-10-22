@@ -6,6 +6,10 @@ static Symbol *current_fn;
 static Symbol *typedefs;  /* Typedef symbols */
 static Symbol *enums;     /* Enum constants */
 
+/* Labels for break/continue */
+static char *current_brk_label;
+static char *current_cont_label;
+
 /* Type definitions */
 static Type *ty_void;
 static Type *ty_char;
@@ -30,6 +34,7 @@ static ASTNode *primary(Token **rest, Token *tok);
 static ASTNode *stmt(Token **rest, Token *tok);
 static ASTNode *compound_stmt(Token **rest, Token *tok);
 static Symbol *find_var(Token *tok);
+static int eval_const_expr(ASTNode *node);
 
 /* Declaration specifiers */
 typedef struct {
@@ -79,6 +84,40 @@ static Symbol *find_enum(Token *tok) {
         }
     }
     return NULL;
+}
+
+/* Evaluate constant expression (for case labels) */
+static int eval_const_expr(ASTNode *node) {
+    if (!node) {
+        error("Expected constant expression");
+    }
+    
+    switch (node->kind) {
+        case ND_NUM:
+            return node->val;
+        case ND_ADD:
+            return eval_const_expr(node->lhs) + eval_const_expr(node->rhs);
+        case ND_SUB:
+            return eval_const_expr(node->lhs) - eval_const_expr(node->rhs);
+        case ND_MUL:
+            return eval_const_expr(node->lhs) * eval_const_expr(node->rhs);
+        case ND_DIV:
+            return eval_const_expr(node->lhs) / eval_const_expr(node->rhs);
+        case ND_VAR:
+            /* Allow enum constants */
+            if (node->var) {
+                /* Check if it's an enum constant - search in enums list */
+                for (Symbol *e = enums; e; e = e->next) {
+                    if (strcmp(e->name, node->var->name) == 0) {
+                        return e->enum_val;
+                    }
+                }
+            }
+            /* Fall through */
+        default:
+            error("Not a constant expression");
+    }
+    return 0;
 }
 
 /* Create new local variable */
@@ -449,7 +488,25 @@ static ASTNode *stmt(Token **rest, Token *tok) {
         tok = skip(tok->next, "(");
         node->cond = expr(&tok, tok);
         tok = skip(tok, ")");
+        
+        /* Save current labels and create new ones */
+        char *old_brk = current_brk_label;
+        char *old_cont = current_cont_label;
+        static int loop_count = 0;
+        char brk_label[32], cont_label[32];
+        sprintf(brk_label, ".L.while.brk.%d", loop_count);
+        sprintf(cont_label, ".L.while.cont.%d", loop_count++);
+        current_brk_label = strdup_custom(brk_label);
+        current_cont_label = strdup_custom(cont_label);
+        node->brk_label = current_brk_label;
+        node->cont_label = current_cont_label;
+        
         node->then = stmt(&tok, tok);
+        
+        /* Restore labels */
+        current_brk_label = old_brk;
+        current_cont_label = old_cont;
+        
         *rest = tok;
         return node;
     }
@@ -475,21 +532,87 @@ static ASTNode *stmt(Token **rest, Token *tok) {
         }
         tok = skip(tok, ")");
         
+        /* Save current labels and create new ones */
+        char *old_brk = current_brk_label;
+        char *old_cont = current_cont_label;
+        static int for_count = 0;
+        char brk_label[32], cont_label[32];
+        sprintf(brk_label, ".L.for.brk.%d", for_count);
+        sprintf(cont_label, ".L.for.cont.%d", for_count++);
+        current_brk_label = strdup_custom(brk_label);
+        current_cont_label = strdup_custom(cont_label);
+        node->brk_label = current_brk_label;
+        node->cont_label = current_cont_label;
+        
         node->then = stmt(&tok, tok);
+        
+        /* Restore labels */
+        current_brk_label = old_brk;
+        current_cont_label = old_cont;
+        
+        *rest = tok;
+        return node;
+    }
+    
+    /* Switch statement */
+    if (tok->kind == TK_SWITCH) {
+        ASTNode *node = new_node(ND_SWITCH);
+        tok = skip(tok->next, "(");
+        node->cond = expr(&tok, tok);
+        tok = skip(tok, ")");
+        
+        /* Save current break label and create new one for switch */
+        char *old_brk = current_brk_label;
+        static int switch_count = 0;
+        char brk_label[32];
+        sprintf(brk_label, ".L.switch.brk.%d", switch_count++);
+        current_brk_label = strdup_custom(brk_label);
+        node->brk_label = current_brk_label;
+        
+        /* Parse switch body (should be compound statement with case/default) */
+        node->then = stmt(&tok, tok);
+        
+        /* Restore break label */
+        current_brk_label = old_brk;
+        
+        *rest = tok;
+        return node;
+    }
+    
+    /* Case statement */
+    if (tok->kind == TK_CASE) {
+        ASTNode *node = new_node(ND_CASE);
+        node->val = eval_const_expr(expr(&tok, tok->next));
+        tok = skip(tok, ":");
+        node->lhs = stmt(&tok, tok);
+        *rest = tok;
+        return node;
+    }
+    
+    /* Default statement */
+    if (tok->kind == TK_DEFAULT) {
+        ASTNode *node = new_node(ND_CASE);
+        node->val = -1;  /* Special value for default */
+        tok = skip(tok->next, ":");
+        node->lhs = stmt(&tok, tok);
         *rest = tok;
         return node;
     }
     
     /* Break statement */
     if (tok->kind == TK_BREAK) {
+        ASTNode *node = new_node(ND_BREAK);
+        node->brk_label = current_brk_label;
         *rest = skip(tok->next, ";");
-        return new_node(ND_BREAK);
+        return node;
     }
     
     /* Continue statement */
     if (tok->kind == TK_CONTINUE) {
+        ASTNode *node = new_node(ND_CONTINUE);
+        node->cont_label = current_cont_label;
         *rest = skip(tok->next, ";");
-        return new_node(ND_CONTINUE);
+        return node;
     }
     
     /* Compound statement */
@@ -763,6 +886,13 @@ static void parse_params(Token **rest, Token *tok, Symbol *fn) {
     while (!equal(tok, ")")) {
         if (cur != &head) {
             tok = skip(tok, ",");
+        }
+        
+        /* Check for variadic parameter (...) */
+        if (tok->kind == TK_ELLIPSIS) {
+            fn->is_variadic = true;
+            tok = tok->next;
+            break;
         }
         
         DeclSpec *spec = declspec(&tok, tok);

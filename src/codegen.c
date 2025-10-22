@@ -269,38 +269,116 @@ static void gen_stmt_asm(ASTNode *node) {
             return;
         }
         case ND_WHILE: {
-            int c = label_count++;
-            emit(".L.begin.%d:", c);
+            emit("%s:", node->cont_label);
             gen_expr_asm(node->cond);
             emit("  cmp rax, 0");
-            emit("  je .L.end.%d", c);
+            emit("  je %s", node->brk_label);
             gen_stmt_asm(node->then);
-            emit("  jmp .L.begin.%d", c);
-            emit(".L.end.%d:", c);
+            emit("  jmp %s", node->cont_label);
+            emit("%s:", node->brk_label);
             return;
         }
         case ND_FOR: {
-            int c = label_count++;
             if (node->init) {
                 gen_stmt_asm(node->init);
             }
-            emit(".L.begin.%d:", c);
+            emit("%s:", node->cont_label);
             if (node->cond) {
                 gen_expr_asm(node->cond);
                 emit("  cmp rax, 0");
-                emit("  je .L.end.%d", c);
+                emit("  je %s", node->brk_label);
             }
             gen_stmt_asm(node->then);
             if (node->inc) {
                 gen_expr_asm(node->inc);
             }
-            emit("  jmp .L.begin.%d", c);
-            emit(".L.end.%d:", c);
+            emit("  jmp %s", node->cont_label);
+            emit("%s:", node->brk_label);
             return;
         }
         case ND_BLOCK:
             for (ASTNode *n = node->body; n; n = n->next) {
                 gen_stmt_asm(n);
+            }
+            return;
+        case ND_SWITCH: {
+            /* Evaluate switch expression */
+            gen_expr_asm(node->cond);
+            
+            /* Track case values and their labels */
+            #define MAX_CASES 256
+            static struct { int val; int label; } case_map[MAX_CASES];
+            int num_cases = 0;
+            int default_label = -1;
+            static int case_label_base = 0;
+            int my_label_base = case_label_base;
+            
+            /* First pass: assign labels to all cases */
+            for (ASTNode *stmt = node->then->body; stmt; stmt = stmt->next) {
+                if (stmt->kind == ND_CASE) {
+                    if (stmt->val >= 0) {
+                        if (num_cases < MAX_CASES) {
+                            case_map[num_cases].val = stmt->val;
+                            case_map[num_cases].label = case_label_base++;
+                            num_cases++;
+                        }
+                    } else {
+                        default_label = case_label_base++;
+                    }
+                }
+            }
+            
+            /* Generate jump table */
+            for (int i = 0; i < num_cases; i++) {
+                emit("  cmp rax, %d", case_map[i].val);
+                emit("  je .L.case.%d", case_map[i].label);
+            }
+            
+            /* Jump to default or break */
+            if (default_label >= 0) {
+                emit("  jmp .L.case.%d", default_label);
+            } else {
+                emit("  jmp %s", node->brk_label);
+            }
+            
+            /* Second pass: generate case bodies with labels */
+            for (ASTNode *stmt = node->then->body; stmt; stmt = stmt->next) {
+                if (stmt->kind == ND_CASE) {
+                    /* Emit label for this case */
+                    if (stmt->val >= 0) {
+                        /* Find label for this case value */
+                        for (int i = 0; i < num_cases; i++) {
+                            if (case_map[i].val == stmt->val) {
+                                emit(".L.case.%d:", case_map[i].label);
+                                break;
+                            }
+                        }
+                    } else {
+                        emit(".L.case.%d:", default_label);
+                    }
+                    if (stmt->lhs) {
+                        gen_stmt_asm(stmt->lhs);
+                    }
+                } else {
+                    gen_stmt_asm(stmt);
+                }
+            }
+            
+            emit("%s:", node->brk_label);
+            return;
+        }
+        case ND_CASE:
+            /* Case labels are handled by ND_SWITCH */
+            gen_stmt_asm(node->lhs);
+            return;
+        case ND_BREAK:
+            if (node->brk_label) {
+                emit("  jmp %s", node->brk_label);
+            }
+            return;
+        case ND_CONTINUE:
+            if (node->cont_label) {
+                emit("  jmp %s", node->cont_label);
             }
             return;
     }
