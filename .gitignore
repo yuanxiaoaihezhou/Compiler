@@ -1,0 +1,23 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.out
+
+# Test outputs
+tests/*_gcc
+tests/*_mycc
+tests/*.out
+tests/*.s
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Temporary files
+/tmp/
+*.tmp
