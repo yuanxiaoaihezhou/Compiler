@@ -15,6 +15,7 @@ cat > "$OUTPUT" << 'EOF'
 #include <stdbool.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <errno.h>
 #include <unistd.h>
 

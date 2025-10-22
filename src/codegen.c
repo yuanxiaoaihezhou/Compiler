@@ -123,6 +123,20 @@ static void gen_expr_asm(ASTNode *node) {
             gen_expr_asm(node->lhs);
             emit("  not rax");
             return;
+        case ND_CAST:
+            /* Generate code for the expression being cast */
+            gen_expr_asm(node->lhs);
+            /* For simple casts (int/char/pointer), just keep the value in rax */
+            /* Sign/zero extension handled implicitly by register usage */
+            if (node->ty && node->ty->size == 1) {
+                /* Cast to char - ensure only low byte is used */
+                emit("  movsx rax, al");
+            } else if (node->ty && node->ty->size == 4) {
+                /* Cast to int - sign extend from 32-bit */
+                emit("  movsxd rax, eax");
+            }
+            /* For pointer casts, rax already contains the value */
+            return;
         case ND_ASSIGN:
             gen_addr(node->lhs);
             push("rax");
@@ -288,7 +302,9 @@ static int label_count = 0;
 static void gen_stmt_asm(ASTNode *node) {
     switch (node->kind) {
         case ND_RETURN:
-            gen_expr_asm(node->lhs);
+            if (node->lhs) {
+                gen_expr_asm(node->lhs);
+            }
             emit("  jmp .L.return.%s", current_function->name);
             return;
         case ND_EXPR_STMT:

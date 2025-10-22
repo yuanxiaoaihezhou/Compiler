@@ -233,6 +233,10 @@ static void process_include(char *line, char *output, int *out_len) {
             output[*out_len] = '\0';
             /* Add NULL define for convenience */
             add_define("NULL", "((void*)0)");
+            /* Add SEEK_* defines */
+            add_define("SEEK_SET", "0");
+            add_define("SEEK_CUR", "1");
+            add_define("SEEK_END", "2");
         } else if (strcmp(filename, "stdlib.h") == 0 || strstr(filename, "stdlib.h")) {
             const char *stdlib_defs = "\n"
                 "int malloc(int size);\n"
@@ -286,7 +290,11 @@ static void process_include(char *line, char *output, int *out_len) {
             output[*out_len] = '\0';
             /* Note: va_start, va_arg, va_end are compiler built-ins */
         } else if (strcmp(filename, "errno.h") == 0 || strstr(filename, "errno.h")) {
-            /* Skip errno.h - not needed for bootstrap */
+            const char *errno_defs = "\nextern int errno;\n";
+            int len = strlen(errno_defs);
+            memcpy(output + *out_len, errno_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
         } else if (strcmp(filename, "unistd.h") == 0 || strstr(filename, "unistd.h")) {
             const char *unistd_defs = "\nint unlink(char *pathname);\n";
             int len = strlen(unistd_defs);
