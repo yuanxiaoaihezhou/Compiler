@@ -485,8 +485,12 @@ void codegen(Symbol *prog, FILE *out) {
             emit(".globl %s", var->name);
             emit("%s:", var->name);
             if (var->ty->kind == TY_ARRAY && var->ty->base->kind == TY_CHAR) {
-                /* String literal */
-                emit("  .string \"%s\"", var->name);
+                /* String literal - use str_data if available */
+                if (var->str_data) {
+                    emit("  .string \"%s\"", var->str_data);
+                } else {
+                    emit("  .string \"%s\"", var->name);
+                }
             } else {
                 emit("  .zero %d", var->ty->size);
             }

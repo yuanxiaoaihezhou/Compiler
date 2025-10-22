@@ -10,6 +10,9 @@ static Symbol *enums;     /* Enum constants */
 static char *current_brk_label;
 static char *current_cont_label;
 
+/* Counter for string literal labels */
+static int string_label_count = 0;
+
 /* Type definitions */
 static Type *ty_void;
 static Type *ty_char;
@@ -167,7 +170,14 @@ static ASTNode *primary(Token **rest, Token *tok) {
     
     /* String literal */
     if (tok->kind == TK_STR) {
-        Symbol *var = new_gvar(tok->str, array_of(ty_char, strlen(tok->str) + 1));
+        /* Create unique label for string literal */
+        char label[32];
+        snprintf(label, sizeof(label), ".LC%d", string_label_count++);
+        
+        /* Create global variable for string with unique label */
+        Symbol *var = new_gvar(strdup_custom(label), array_of(ty_char, strlen(tok->str) + 1));
+        var->str_data = strdup_custom(tok->str);  /* Store actual string content */
+        
         ASTNode *node = new_node(ND_VAR);
         node->var = var;
         *rest = tok->next;
@@ -1212,6 +1222,11 @@ Symbol *parse(Token *tok) {
             }
             tok = skip(tok, ";");
         }
+    }
+    
+    /* Merge globals (including string literals) into the result chain */
+    if (globals) {
+        cur->next = globals;
     }
     
     return head.next;
