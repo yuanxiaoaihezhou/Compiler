@@ -1137,6 +1137,13 @@ static void parse_params(Token **rest, Token *tok, Symbol *fn) {
         return;
     }
     
+    /* Handle void parameter (no parameters) */
+    if (tok->kind == TK_VOID && equal(tok->next, ")")) {
+        tok = tok->next;
+        *rest = tok->next;
+        return;
+    }
+    
     Symbol head = {0};
     Symbol *cur = &head;
     

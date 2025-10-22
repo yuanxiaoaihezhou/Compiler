@@ -244,7 +244,7 @@ char *read_file(char *path);
 bool consume(Token **rest, Token *tok, char *op);
 bool equal(Token *tok, char *op);
 Token *skip(Token *tok, char *op);
-char *strndup_custom(const char *s, size_t n);
+char *strndup_custom(const char *s, int n);
 char *strdup_custom(const char *s);
 
 /* Global state */

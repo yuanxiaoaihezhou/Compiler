@@ -206,9 +206,24 @@ static void process_include(char *line, char *output, int *out_len) {
     
     /* Skip system headers - we don't need to parse them */
     if (is_system_header) {
-        /* For certain headers, output necessary typedefs */
+        /* For certain headers, output necessary typedefs and function declarations */
         if (strcmp(filename, "stdio.h") == 0 || strstr(filename, "stdio.h")) {
-            const char *stdio_defs = "\ntypedef int FILE;\n";
+            const char *stdio_defs = "\ntypedef int FILE;\n"
+                "int printf(char *fmt, ...);\n"
+                "int fprintf(int stream, char *fmt, ...);\n"
+                "int sprintf(char *str, char *fmt, ...);\n"
+                "int snprintf(char *str, int size, char *fmt, ...);\n"
+                "int vfprintf(int stream, char *fmt, int ap);\n"
+                "int fopen(char *filename, char *mode);\n"
+                "int fclose(int stream);\n"
+                "int fread(int ptr, int size, int nmemb, int stream);\n"
+                "int fwrite(int ptr, int size, int nmemb, int stream);\n"
+                "int fseek(int stream, int offset, int whence);\n"
+                "int ftell(int stream);\n"
+                "int feof(int stream);\n"
+                "int ferror(int stream);\n"
+                "int putchar(int c);\n"
+                "int puts(char *s);\n";
             int len = strlen(stdio_defs);
             memcpy(output + *out_len, stdio_defs, len);
             *out_len += len;
