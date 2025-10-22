@@ -141,6 +141,21 @@ static void process_include(char *line, char *output, int *out_len) {
     
     /* Skip system headers - we don't need to parse them */
     if (is_system_header) {
+        /* For certain headers, output necessary typedefs */
+        if (strcmp(filename, "stdbool.h") == 0 || strstr(filename, "stdbool.h")) {
+            const char *bool_defs = "\ntypedef int bool;\n";
+            int len = strlen(bool_defs);
+            memcpy(output + *out_len, bool_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
+        } else if (strcmp(filename, "stddef.h") == 0 || strstr(filename, "stddef.h")) {
+            const char *stddef_defs = "\ntypedef unsigned long size_t;\ntypedef long ptrdiff_t;\n";
+            int len = strlen(stddef_defs);
+            memcpy(output + *out_len, stddef_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
+        }
+        
         free(filename);
         return;
     }
