@@ -179,6 +179,22 @@ static void gen_expr_asm(ASTNode *node) {
             free(args);
             return;
         }
+        case ND_CAST:
+            /* For now, casts are mostly no-ops at code generation level */
+            /* Just generate code for the expression being cast */
+            gen_expr_asm(node->lhs);
+            /* Handle size conversions if needed */
+            if (node->ty) {
+                if (node->ty->size == 1) {
+                    /* Cast to char - mask to 8 bits */
+                    emit("  movsx rax, al");
+                } else if (node->ty->size == 4) {
+                    /* Cast to int - mask to 32 bits */
+                    emit("  movsxd rax, eax");
+                }
+                /* For pointer casts, no additional code needed */
+            }
+            return;
         case ND_COMMA:
             gen_expr_asm(node->lhs);
             gen_expr_asm(node->rhs);

@@ -165,6 +165,11 @@ static int gen_expr(ASTNode *node) {
             gen_expr(node->lhs);
             return gen_expr(node->rhs);
         }
+        case ND_CAST: {
+            /* For casts, just generate code for the inner expression */
+            /* Type conversions are handled at code generation level */
+            return gen_expr(node->lhs);
+        }
         default:
             error("unsupported expression in IR generation");
             return 0;

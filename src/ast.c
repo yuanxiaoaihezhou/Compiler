@@ -138,6 +138,9 @@ void add_type(ASTNode *node) {
         case ND_MEMBER:
             node->ty = node->member->ty;
             return;
+        case ND_CAST:
+            /* Type is already set during parsing */
+            return;
         case ND_SIZEOF:
             node->ty = new_type(TY_INT, 4, 4);
             return;

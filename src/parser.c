@@ -39,6 +39,7 @@ static ASTNode *compound_stmt(Token **rest, Token *tok);
 static Symbol *find_var(Token *tok);
 static int eval_const_expr(ASTNode *node);
 static void gen_init_code(ASTNode **cur_stmt, ASTNode *var_node, Initializer *init, Type *ty);
+static bool is_typename(Token *tok);
 
 /* Declaration specifiers */
 typedef struct {
@@ -88,6 +89,34 @@ static Symbol *find_enum(Token *tok) {
         }
     }
     return NULL;
+}
+
+/* Check if token starts a typename */
+static bool is_typename(Token *tok) {
+    /* Basic type keywords */
+    if (tok->kind == TK_VOID || tok->kind == TK_CHAR || tok->kind == TK_INT) {
+        return true;
+    }
+    
+    /* struct/enum keywords */
+    if (tok->kind == TK_STRUCT || tok->kind == TK_ENUM) {
+        return true;
+    }
+    
+    /* Type qualifiers */
+    if (tok->kind == TK_CONST) {
+        return true;
+    }
+    
+    /* Check if it's a typedef name */
+    if (tok->kind == TK_IDENT) {
+        Symbol *td = find_typedef(tok);
+        if (td) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 /* Evaluate constant expression (for case labels) */
@@ -275,6 +304,28 @@ static ASTNode *postfix(Token **rest, Token *tok) {
 
 /* Parse unary expression */
 static ASTNode *unary(Token **rest, Token *tok) {
+    /* Cast expression: (type) expr */
+    if (equal(tok, "(") && is_typename(tok->next)) {
+        Token *start = tok;
+        tok = tok->next;
+        
+        /* Parse the type */
+        DeclSpec *spec = declspec(&tok, tok);
+        Type *ty = declarator(&tok, tok, spec->ty);
+        tok = skip(tok, ")");
+        
+        /* Parse the expression being cast */
+        ASTNode *expr_node = unary(&tok, tok);
+        
+        /* Create cast node */
+        ASTNode *node = new_node(ND_CAST);
+        node->lhs = expr_node;
+        node->ty = ty;
+        
+        *rest = tok;
+        return node;
+    }
+    
     if (equal(tok, "+")) {
         return unary(rest, tok->next);
     }
