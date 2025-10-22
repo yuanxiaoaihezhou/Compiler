@@ -359,10 +359,24 @@ static ASTNode *unary(Token **rest, Token *tok) {
     }
     
     if (tok->kind == TK_SIZEOF) {
-        ASTNode *node = unary(rest, tok->next);
+        tok = tok->next;
+        
+        /* Check if it's sizeof(type) */
+        if (equal(tok, "(") && is_typename(tok->next)) {
+            tok = tok->next;
+            
+            /* Parse type */
+            DeclSpec *spec = declspec(&tok, tok);
+            Type *ty = declarator(&tok, tok, spec->ty);
+            *rest = skip(tok, ")");
+            
+            return new_num(ty->size);
+        }
+        
+        /* Otherwise it's sizeof expr */
+        ASTNode *node = unary(rest, tok);
         add_type(node);
-        ASTNode *size_node = new_num(node->ty->size);
-        return size_node;
+        return new_num(node->ty->size);
     }
     
     /* Cast expression: (type)expr */
@@ -554,7 +568,14 @@ static ASTNode *stmt(Token **rest, Token *tok) {
     /* Return statement */
     if (tok->kind == TK_RETURN) {
         ASTNode *node = new_node(ND_RETURN);
-        node->lhs = expr(&tok, tok->next);
+        
+        /* Check if there's a return value */
+        if (!equal(tok->next, ";")) {
+            node->lhs = expr(&tok, tok->next);
+        } else {
+            tok = tok->next;
+        }
+        
         *rest = skip(tok, ";");
         return node;
     }

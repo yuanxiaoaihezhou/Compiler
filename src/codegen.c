@@ -302,7 +302,9 @@ static int label_count = 0;
 static void gen_stmt_asm(ASTNode *node) {
     switch (node->kind) {
         case ND_RETURN:
-            gen_expr_asm(node->lhs);
+            if (node->lhs) {
+                gen_expr_asm(node->lhs);
+            }
             emit("  jmp .L.return.%s", current_function->name);
             return;
         case ND_EXPR_STMT:
