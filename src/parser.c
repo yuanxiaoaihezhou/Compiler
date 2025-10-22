@@ -193,15 +193,19 @@ static ASTNode *unary(Token **rest, Token *tok) {
         return new_binary(ND_SUB, new_num(0), unary(rest, tok->next));
     }
     if (equal(tok, "&")) {
-        ASTNode *lhs = unary(rest, tok->next);
-        return new_node(ND_ADDR)->lhs = lhs, new_node(ND_ADDR);
+        ASTNode *node = new_node(ND_ADDR);
+        node->lhs = unary(rest, tok->next);
+        return node;
     }
     if (equal(tok, "*")) {
-        ASTNode *lhs = unary(rest, tok->next);
-        return new_node(ND_DEREF)->lhs = lhs, new_node(ND_DEREF);
+        ASTNode *node = new_node(ND_DEREF);
+        node->lhs = unary(rest, tok->next);
+        return node;
     }
     if (equal(tok, "!")) {
-        return new_node(ND_LNOT)->lhs = unary(rest, tok->next), new_node(ND_LNOT);
+        ASTNode *node = new_node(ND_LNOT);
+        node->lhs = unary(rest, tok->next);
+        return node;
     }
     if (tok->kind == TK_SIZEOF) {
         ASTNode *node = unary(rest, tok->next);
@@ -476,7 +480,27 @@ static ASTNode *compound_stmt(Token **rest, Token *tok) {
                 }
                 
                 Type *ty = declarator(&tok, tok, basety);
-                Symbol *var = new_lvar(strndup_custom(tok->str, tok->len), ty);
+                
+                if (tok->kind != TK_IDENT) {
+                    error_tok(tok, "expected variable name");
+                }
+                
+                char *name = strndup_custom(tok->str, tok->len);
+                tok = tok->next;
+                
+                /* Handle array declarator */
+                if (equal(tok, "[")) {
+                    tok = tok->next;
+                    int len = 0;
+                    if (tok->kind == TK_NUM) {
+                        len = tok->val;
+                        tok = tok->next;
+                    }
+                    tok = skip(tok, "]");
+                    ty = array_of(ty, len);
+                }
+                
+                Symbol *var = new_lvar(name, ty);
                 
                 if (equal(tok, "=")) {
                     ASTNode *lhs = new_node(ND_VAR);
@@ -524,18 +548,6 @@ static Type *declarator(Token **rest, Token *tok, Type *ty) {
     while (equal(tok, "*")) {
         ty = pointer_to(ty);
         tok = tok->next;
-    }
-    
-    /* Array */
-    if (tok->kind == TK_IDENT && equal(tok->next, "[")) {
-        tok = tok->next->next;
-        int len = 0;
-        if (tok->kind == TK_NUM) {
-            len = tok->val;
-            tok = tok->next;
-        }
-        tok = skip(tok, "]");
-        ty = array_of(ty, len);
     }
     
     *rest = tok;
@@ -595,8 +607,12 @@ static Symbol *function(Token **rest, Token *tok) {
     
     /* Add parameters to locals */
     for (Symbol *param = fn->params; param; param = param->next) {
-        param->next = locals;
-        locals = param;
+        Symbol *local = calloc(1, sizeof(Symbol));
+        local->name = param->name;
+        local->ty = param->ty;
+        local->is_local = true;
+        local->next = locals;
+        locals = local;
     }
     
     current_fn = fn;

@@ -325,7 +325,17 @@ static void gen_function_asm(Symbol *fn) {
     char *argregs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
     int i = 0;
     for (Symbol *param = fn->params; param && i < 6; param = param->next, i++) {
-        emit("  mov [rbp-%d], %s", param->offset, argregs[i]);
+        /* Find this parameter in locals to get its offset */
+        Symbol *local = NULL;
+        for (Symbol *l = fn->locals; l; l = l->next) {
+            if (strcmp(l->name, param->name) == 0) {
+                local = l;
+                break;
+            }
+        }
+        if (local) {
+            emit("  mov [rbp-%d], %s", local->offset, argregs[i]);
+        }
     }
     
     stack_depth = 0;
