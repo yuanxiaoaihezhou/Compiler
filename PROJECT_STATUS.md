@@ -157,7 +157,14 @@ make test
 
 ### 测试自举能力
 ```bash
+# 基础自举测试
 make bootstrap
+
+# 多阶段自举测试
+make bootstrap-stage1    # 尝试用编译器编译自己（阶段1）
+make bootstrap-stage2    # 用阶段1编译器编译自己（阶段2）
+make bootstrap-full      # 完整的3阶段自举验证
+make bootstrap-test      # 用自举编译器运行测试套件
 ```
 
 ### 使用编译器
@@ -172,9 +179,10 @@ make bootstrap
 - ✅ 可以编译简单到中等复杂度的C程序
 - ✅ 所有测试程序都能正确编译和运行
 - ✅ 提供了源代码合并工具用于多文件编译
-- ⚠️ 完全自举（编译自身）需要实现额外的C特性
+- ✅ Makefile提供了完整的多阶段自举选项（bootstrap、bootstrap-stage1、bootstrap-stage2、bootstrap-full、bootstrap-test）
+- ⚠️ 完全自举（编译自身）需要实现额外的C特性（typedef、enum等）
 
-详见 `docs/SELF_HOSTING.md` 了解完整自举所需的功能。
+详见 `docs/SELF_HOSTING.md` 了解完整自举所需的功能和各个自举阶段的说明。
 
 ## 性能指标
 
