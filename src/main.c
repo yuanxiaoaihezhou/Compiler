@@ -64,13 +64,17 @@ int main(int argc, char **argv) {
     
     /* Add specified include directories */
     for (int i = 0; i < include_dir_count; i++) {
-        compiler_state->include_paths[compiler_state->include_count++] = include_dirs[i];
+        compiler_state->include_paths[compiler_state->include_count] = include_dirs[i];
+        compiler_state->include_count++;
     }
     
     /* Add default include paths */
-    compiler_state->include_paths[compiler_state->include_count++] = ".";
-    compiler_state->include_paths[compiler_state->include_count++] = "/usr/include";
-    compiler_state->include_paths[compiler_state->include_count++] = "/usr/local/include";
+    compiler_state->include_paths[compiler_state->include_count] = ".";
+    compiler_state->include_count++;
+    compiler_state->include_paths[compiler_state->include_count] = "/usr/include";
+    compiler_state->include_count++;
+    compiler_state->include_paths[compiler_state->include_count] = "/usr/local/include";
+    compiler_state->include_count++;
     
     /* Preprocess */
     char *preprocessed = preprocess(input_file);

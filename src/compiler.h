@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <stddef.h>
 
 /* Forward declarations */
 typedef struct Token Token;
