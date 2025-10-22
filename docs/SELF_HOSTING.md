@@ -46,30 +46,30 @@ The following features are used in the compiler source but not yet implemented:
 - [x] Zero initializer (`{0}`) ✓ IMPLEMENTED (parsing support)
 - [x] Pointer arithmetic scaling ✓ IMPLEMENTED
 - [x] Array decay to pointer ✓ IMPLEMENTED
+- [x] Cast expressions (`(type)expr`) ✓ IMPLEMENTED (2024-10-22)
+- [x] Postfix/prefix increment/decrement (`++`, `--`) ✓ IMPLEMENTED (2024-10-22)
+- [x] C99 for loop declarations (`for (int i = 0; ...)`) ✓ IMPLEMENTED (2024-10-22)
+- [x] `sizeof(type)` syntax ✓ IMPLEMENTED (2024-10-22)
+- [x] Void return statements (`return;`) ✓ IMPLEMENTED (2024-10-22)
 
 ### Critical Features (Still Needed for Full Self-Hosting)
 - [ ] String array initializers (`char *arr[] = {"str1", "str2"}`) - **Used in compiler source**
 - [ ] Array of struct initializers - **Used for keywords array**
 - [ ] Global variable initialization with brace initializers
 - [ ] String literal storage in .data/.rodata section
-- [ ] Cast expressions
 - [ ] Compound literals
 - [ ] Designated initializers
 - [ ] `goto` and labels
 - [ ] Full va_list/va_start/va_end support (compiler built-ins)
 
-### Standard Library Functions
-- [ ] `calloc`, `malloc`, `free` - memory allocation
-- [ ] `strcmp`, `strncmp`, `strlen`, `strcpy`, `strcat` - string functions
-- [ ] `printf`, `fprintf`, `sprintf`, `vfprintf` - formatted output
-- [ ] `fopen`, `fclose`, `fread`, `fwrite`, `fseek`, `ftell` - file I/O
-- [ ] `exit` - program termination
-
-### Preprocessor
-- [ ] `#define` - macro definitions
-- [ ] `#ifdef`, `#ifndef`, `#endif` - conditional compilation
-- [ ] Macro expansion
-- [ ] Predefined macros
+### Preprocessor Features (Partially Implemented)
+- [x] `#include` - file inclusion ✓ IMPLEMENTED
+- [x] `#define` - macro definitions ✓ IMPLEMENTED (basic support)
+- [x] `#ifdef`, `#ifndef`, `#else`, `#endif` - conditional compilation ✓ IMPLEMENTED
+- [x] Basic macro expansion ✓ IMPLEMENTED
+- [x] System header stubs (stdio.h, stdlib.h, string.h, etc.) ✓ IMPLEMENTED
+- [ ] Full macro expansion with arguments
+- [ ] Predefined macros (__FILE__, __LINE__, etc.)
 
 ## Workaround: Combined Source File
 
