@@ -16,12 +16,14 @@ static void emit(char *fmt, ...) {
     va_end(ap);
 }
 
+/* Register name lookup tables (global for self-hosting compatibility) */
+static char *regs64[] = {"rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9", "r10", "r11"};
+static char *regs32[] = {"eax", "edi", "esi", "edx", "ecx", "r8d", "r9d", "r10d", "r11d"};
+static char *regs8[] = {"al", "dil", "sil", "dl", "cl", "r8b", "r9b", "r10b", "r11b"};
+static char *argregs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+
 /* Get register name */
 static char *reg_name(int r, int size) {
-    static char *regs64[] = {"rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9", "r10", "r11"};
-    static char *regs32[] = {"eax", "edi", "esi", "edx", "ecx", "r8d", "r9d", "r10d", "r11d"};
-    static char *regs8[] = {"al", "dil", "sil", "dl", "cl", "r8b", "r9b", "r10b", "r11b"};
-    
     if (r < 0 || r >= 9) {
         return "rax";
     }
@@ -140,7 +142,6 @@ static void gen_expr_asm(ASTNode *node) {
             }
             
             /* Generate code for arguments */
-            char *argregs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
             for (i = 0; i < nargs && i < 6; i++) {
                 gen_expr_asm(args[i]);
                 push("rax");
@@ -436,7 +437,6 @@ static void gen_function_asm(Symbol *fn) {
     emit("  sub rsp, %d", fn->stack_size);
     
     /* Save parameters to stack */
-    char *argregs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
     int i = 0;
     for (Symbol *param = fn->params; param && i < 6; param = param->next, i++) {
         /* Find this parameter in locals to get its offset */
@@ -484,10 +484,74 @@ void codegen(Symbol *prog, FILE *out) {
         if (!var->is_function && !var->is_local) {
             emit(".globl %s", var->name);
             emit("%s:", var->name);
+            
             if (var->ty->kind == TY_ARRAY && var->ty->base->kind == TY_CHAR) {
-                /* String literal */
-                emit("  .string \"%s\"", var->name);
+                /* String literal - use str_data if available */
+                if (var->str_data) {
+                    emit("  .string \"%s\"", var->str_data);
+                } else {
+                    emit("  .string \"%s\"", var->name);
+                }
+            } else if (var->init) {
+                /* Global variable with initializer */
+                if (var->ty->kind == TY_ARRAY) {
+                    /* Array initializer */
+                    Type *elem_ty = var->ty->base;
+                    for (Initializer *init = var->init->children; init; init = init->next) {
+                        if (elem_ty->kind == TY_PTR || elem_ty->kind == TY_ARRAY) {
+                            /* Pointer or array element - emit as quad (8 bytes) */
+                            if (init->is_expr && init->expr->kind == ND_VAR) {
+                                /* Pointer to string literal or global */
+                                emit("  .quad %s", init->expr->var->name);
+                            } else {
+                                emit("  .quad 0");
+                            }
+                        } else if (elem_ty->kind == TY_INT) {
+                            /* Integer element - emit as long (4 bytes) */
+                            if (init->is_expr && init->expr->kind == ND_NUM) {
+                                emit("  .long %d", init->expr->val);
+                            } else {
+                                emit("  .long 0");
+                            }
+                        } else if (elem_ty->kind == TY_CHAR) {
+                            /* Char element - emit as byte */
+                            if (init->is_expr && init->expr->kind == ND_NUM) {
+                                emit("  .byte %d", init->expr->val);
+                            } else {
+                                emit("  .byte 0");
+                            }
+                        } else {
+                            /* Unknown type - use zero */
+                            emit("  .zero %d", elem_ty->size);
+                        }
+                    }
+                } else if (var->ty->kind == TY_INT) {
+                    /* Simple int initializer */
+                    if (var->init->is_expr && var->init->expr->kind == ND_NUM) {
+                        emit("  .long %d", var->init->expr->val);
+                    } else {
+                        emit("  .long 0");
+                    }
+                } else if (var->ty->kind == TY_CHAR) {
+                    /* Simple char initializer */
+                    if (var->init->is_expr && var->init->expr->kind == ND_NUM) {
+                        emit("  .byte %d", var->init->expr->val);
+                    } else {
+                        emit("  .byte 0");
+                    }
+                } else if (var->ty->kind == TY_PTR) {
+                    /* Pointer initializer */
+                    if (var->init->is_expr && var->init->expr->kind == ND_VAR) {
+                        emit("  .quad %s", var->init->expr->var->name);
+                    } else {
+                        emit("  .quad 0");
+                    }
+                } else {
+                    /* Other types - zero fill */
+                    emit("  .zero %d", var->ty->size);
+                }
             } else {
+                /* No initializer - zero fill */
                 emit("  .zero %d", var->ty->size);
             }
         }

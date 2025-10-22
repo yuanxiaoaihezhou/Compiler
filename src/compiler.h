@@ -167,6 +167,7 @@ struct Symbol {
     int enum_val;      /* For enum constants */
     bool is_variadic;  /* Is this a variadic function? */
     Initializer *init; /* Variable initializer */
+    char *str_data;    /* String literal content (for string literals) */
 };
 
 /* Intermediate representation */

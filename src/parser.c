@@ -10,6 +10,9 @@ static Symbol *enums;     /* Enum constants */
 static char *current_brk_label;
 static char *current_cont_label;
 
+/* Counter for string literal labels */
+static int string_label_count = 0;
+
 /* Type definitions */
 static Type *ty_void;
 static Type *ty_char;
@@ -35,6 +38,7 @@ static ASTNode *stmt(Token **rest, Token *tok);
 static ASTNode *compound_stmt(Token **rest, Token *tok);
 static Symbol *find_var(Token *tok);
 static int eval_const_expr(ASTNode *node);
+static void gen_init_code(ASTNode **cur_stmt, ASTNode *var_node, Initializer *init, Type *ty);
 
 /* Declaration specifiers */
 typedef struct {
@@ -167,7 +171,14 @@ static ASTNode *primary(Token **rest, Token *tok) {
     
     /* String literal */
     if (tok->kind == TK_STR) {
-        Symbol *var = new_gvar(tok->str, array_of(ty_char, strlen(tok->str) + 1));
+        /* Create unique label for string literal */
+        char label[32];
+        snprintf(label, sizeof(label), ".LC%d", string_label_count++);
+        
+        /* Create global variable for string with unique label */
+        Symbol *var = new_gvar(strdup_custom(label), array_of(ty_char, strlen(tok->str) + 1));
+        var->str_data = strdup_custom(tok->str);  /* Store actual string content */
+        
         ASTNode *node = new_node(ND_VAR);
         node->var = var;
         *rest = tok->next;
@@ -624,6 +635,51 @@ static ASTNode *stmt(Token **rest, Token *tok) {
     return expr_stmt(rest, tok);
 }
 
+/* Generate initialization code for a variable */
+static void gen_init_code(ASTNode **cur_stmt, ASTNode *var_node, Initializer *init, Type *ty) {
+    if (!init) return;
+    
+    if (init->is_expr) {
+        /* Simple expression initializer */
+        ASTNode *assign_node = new_binary(ND_ASSIGN, var_node, init->expr);
+        *cur_stmt = (*cur_stmt)->next = new_node(ND_EXPR_STMT);
+        (*cur_stmt)->lhs = assign_node;
+    } else if (init->children) {
+        /* Compound initializer - handle array or struct */
+        if (ty->kind == TY_ARRAY) {
+            /* Array initialization */
+            int idx = 0;
+            for (Initializer *child = init->children; child; child = child->next) {
+                /* Create array element access: var[idx] */
+                ASTNode *addr = new_node(ND_ADDR);
+                addr->lhs = var_node;
+                
+                ASTNode *index = new_num(idx);
+                ASTNode *ptr = new_binary(ND_ADD, addr, index);
+                
+                ASTNode *elem = new_node(ND_DEREF);
+                elem->lhs = ptr;
+                
+                /* Recursively initialize element */
+                gen_init_code(cur_stmt, elem, child, ty->base);
+                idx++;
+            }
+        } else if (ty->kind == TY_STRUCT) {
+            /* Struct initialization */
+            Member *mem = ty->members;
+            for (Initializer *child = init->children; child && mem; child = child->next, mem = mem->next) {
+                /* Create member access: var.member */
+                ASTNode *member_access = new_node(ND_MEMBER);
+                member_access->lhs = var_node;
+                member_access->member = mem;
+                
+                /* Recursively initialize member */
+                gen_init_code(cur_stmt, member_access, child, mem->ty);
+            }
+        }
+    }
+}
+
 /* Parse compound statement */
 static ASTNode *compound_stmt(Token **rest, Token *tok) {
     tok = skip(tok, "{");
@@ -706,44 +762,9 @@ static ASTNode *compound_stmt(Token **rest, Token *tok) {
                     var->init = init;
                     
                     /* Generate assignment code for the initializer */
-                    if (ty->kind == TY_ARRAY) {
-                        /* Handle array initialization */
-                        int idx = 0;
-                        for (Initializer *i = init->children; i; i = i->next) {
-                            /* Create: var[idx] = value */
-                            ASTNode *lhs = new_node(ND_VAR);
-                            lhs->var = var;
-                            
-                            /* For arrays, we need to get the address and add offset */
-                            /* Create: &var */
-                            ASTNode *addr = new_node(ND_ADDR);
-                            addr->lhs = lhs;
-                            
-                            /* Create index (unscaled - ADD will handle scaling) */
-                            ASTNode *index = new_num(idx);
-                            
-                            /* Create array access: &var + idx */
-                            ASTNode *ptr = new_binary(ND_ADD, addr, index);
-                            
-                            /* Dereference to get array element */
-                            ASTNode *elem = new_node(ND_DEREF);
-                            elem->lhs = ptr;
-                            
-                            /* Assign value */
-                            ASTNode *assign_node = new_binary(ND_ASSIGN, elem, i->expr);
-                            cur = cur->next = new_node(ND_EXPR_STMT);
-                            cur->lhs = assign_node;
-                            
-                            idx++;
-                        }
-                    } else if (init->is_expr) {
-                        /* Simple assignment */
-                        ASTNode *lhs = new_node(ND_VAR);
-                        lhs->var = var;
-                        ASTNode *node = new_binary(ND_ASSIGN, lhs, init->expr);
-                        cur = cur->next = new_node(ND_EXPR_STMT);
-                        cur->lhs = node;
-                    }
+                    ASTNode *var_node = new_node(ND_VAR);
+                    var_node->var = var;
+                    gen_init_code(&cur, var_node, init, ty);
                 }
             }
             tok = skip(tok, ";");
@@ -819,24 +840,24 @@ Initializer *parse_initializer(Token **rest, Token *tok, Type *ty) {
             return init;
         }
         
-        /* Handle struct type - for now, treat like array */
-        /* TODO: Implement proper struct member initialization */
-        if (ty->kind == TY_STRUCT || ty->kind == TY_INT || ty->kind == TY_CHAR || ty->kind == TY_PTR) {
-            /* For simple types, just parse a list of values */
+        /* Handle struct type */
+        if (ty->kind == TY_STRUCT) {
+            if (!ty->members) {
+                error_tok(tok, "struct has no members");
+            }
+            
+            Member *mem = ty->members;
             Initializer *cur = NULL;
             int i = 0;
             
-            while (!equal(tok, "}")) {
+            while (!equal(tok, "}") && mem) {
                 if (i > 0) {
                     tok = skip(tok, ",");
                     if (equal(tok, "}")) break;
                 }
                 
-                /* For struct/simple types, parse as expression */
-                ASTNode *expr_node = assign(&tok, tok);
-                Initializer *elem = new_initializer(ty);
-                elem->is_expr = true;
-                elem->expr = expr_node;
+                /* Parse member initializer */
+                Initializer *elem = parse_initializer(&tok, tok, mem->ty);
                 elem->index = i;
                 
                 if (cur) {
@@ -845,7 +866,25 @@ Initializer *parse_initializer(Token **rest, Token *tok, Type *ty) {
                     init->children = elem;
                 }
                 cur = elem;
+                mem = mem->next;
                 i++;
+            }
+            *rest = skip(tok, "}");
+            return init;
+        }
+        
+        /* Handle simple types (int, char, ptr) - for now, treat like single value */
+        if (ty->kind == TY_INT || ty->kind == TY_CHAR || ty->kind == TY_PTR) {
+            /* For simple types in braces, parse a single value */
+            ASTNode *expr_node = assign(&tok, tok);
+            Initializer *elem = new_initializer(ty);
+            elem->is_expr = true;
+            elem->expr = expr_node;
+            
+            init->children = elem;
+            /* Allow optional trailing comma */
+            if (equal(tok, ",")) {
+                tok = tok->next;
             }
             *rest = skip(tok, "}");
             return init;
@@ -964,23 +1003,73 @@ static DeclSpec *declspec(Token **rest, Token *tok) {
     if (tok->kind == TK_STRUCT) {
         tok = tok->next;
         
-        /* For now, just skip struct definitions */
+        /* Optional struct tag (we'll ignore it for now) */
         if (tok->kind == TK_IDENT) {
             tok = tok->next;
         }
         
+        /* Parse struct body */
         if (equal(tok, "{")) {
-            int depth = 1;
             tok = tok->next;
-            while (depth > 0) {
-                if (equal(tok, "{")) depth++;
-                else if (equal(tok, "}")) depth--;
-                tok = tok->next;
+            
+            Type *struct_ty = calloc(1, sizeof(Type));
+            struct_ty->kind = TY_STRUCT;
+            struct_ty->size = 0;
+            struct_ty->align = 1;
+            
+            Member head = {0};
+            Member *cur_mem = &head;
+            int offset = 0;
+            
+            /* Parse struct members */
+            while (!equal(tok, "}")) {
+                /* Parse member type */
+                DeclSpec *mem_spec = declspec(&tok, tok);
+                
+                /* Parse member declarator(s) */
+                bool first_member = true;
+                while (!equal(tok, ";")) {
+                    if (!first_member) {
+                        tok = skip(tok, ",");
+                    }
+                    first_member = false;
+                    
+                    Type *mem_ty = declarator(&tok, tok, mem_spec->ty);
+                    
+                    if (tok->kind != TK_IDENT) {
+                        error_tok(tok, "expected member name");
+                    }
+                    
+                    Member *mem = calloc(1, sizeof(Member));
+                    mem->ty = mem_ty;
+                    mem->name = strndup_custom(tok->str, tok->len);
+                    mem->offset = offset;
+                    
+                    /* Update offset and size */
+                    offset += mem_ty->size;
+                    
+                    cur_mem = cur_mem->next = mem;
+                    tok = tok->next;
+                }
+                tok = skip(tok, ";");
             }
+            tok = skip(tok, "}");
+            
+            struct_ty->members = head.next;
+            struct_ty->size = offset;
+            
+            spec->ty = struct_ty;
+            *rest = tok;
+            return spec;
         }
         
-        /* Treat struct as int for now (simplified) */
-        spec->ty = ty_int;
+        /* Struct without body - treat as opaque type */
+        Type *struct_ty = calloc(1, sizeof(Type));
+        struct_ty->kind = TY_STRUCT;
+        struct_ty->size = 8;  /* Default size */
+        struct_ty->align = 8;
+        
+        spec->ty = struct_ty;
         *rest = tok;
         return spec;
     }
@@ -1005,6 +1094,29 @@ static Type *declarator(Token **rest, Token *tok, Type *ty) {
     while (equal(tok, "*")) {
         ty = pointer_to(ty);
         tok = tok->next;
+    }
+    
+    /* Identifier (we don't actually consume it here, just skip past it) */
+    /* Note: The caller is responsible for consuming the identifier */
+    
+    *rest = tok;
+    return ty;
+}
+
+/* Parse array/function suffix for declarator */
+static Type *parse_declarator_suffix(Token **rest, Token *tok, Type *ty) {
+    /* Array declarator: [size] */
+    if (equal(tok, "[")) {
+        tok = tok->next;
+        int len = 0;
+        if (tok->kind == TK_NUM) {
+            len = tok->val;
+            tok = tok->next;
+        }
+        tok = skip(tok, "]");
+        ty = array_of(ty, len);
+        /* Recursively handle more dimensions or function */
+        ty = parse_declarator_suffix(&tok, tok, ty);
     }
     
     *rest = tok;
@@ -1197,21 +1309,30 @@ Symbol *parse(Token *tok) {
                     error_tok(tok, "expected variable name");
                 }
                 
-                Symbol *var = new_gvar(strndup_custom(tok->str, tok->len), ty);
-                var->is_static = spec->is_static;
-                var->is_extern = spec->is_extern;
+                char *var_name = strndup_custom(tok->str, tok->len);
                 tok = tok->next;
                 
+                /* Parse array/function suffix */
+                ty = parse_declarator_suffix(&tok, tok, ty);
+                
+                Symbol *var = new_gvar(var_name, ty);
+                var->is_static = spec->is_static;
+                var->is_extern = spec->is_extern;
+                
                 if (equal(tok, "=")) {
-                    /* Skip initializer for now */
+                    /* Parse global initializer */
                     tok = tok->next;
-                    while (!equal(tok, ",") && !equal(tok, ";")) {
-                        tok = tok->next;
-                    }
+                    Initializer *init = parse_initializer(&tok, tok, ty);
+                    var->init = init;
                 }
             }
             tok = skip(tok, ";");
         }
+    }
+    
+    /* Merge globals (including string literals) into the result chain */
+    if (globals) {
+        cur->next = globals;
     }
     
     return head.next;
