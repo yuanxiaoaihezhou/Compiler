@@ -45,7 +45,7 @@ $(COMPILER): $(OBJS)
 # Run tests
 test: $(COMPILER)
 	@echo "Running test suite..."
-	@bash $(TEST_DIR)/run_tests.sh
+	@cd $(TEST_DIR) && bash run_tests.sh
 
 # Generate documentation
 doc:
