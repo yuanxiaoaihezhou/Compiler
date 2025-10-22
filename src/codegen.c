@@ -484,6 +484,7 @@ void codegen(Symbol *prog, FILE *out) {
         if (!var->is_function && !var->is_local) {
             emit(".globl %s", var->name);
             emit("%s:", var->name);
+            
             if (var->ty->kind == TY_ARRAY && var->ty->base->kind == TY_CHAR) {
                 /* String literal - use str_data if available */
                 if (var->str_data) {
@@ -491,7 +492,45 @@ void codegen(Symbol *prog, FILE *out) {
                 } else {
                     emit("  .string \"%s\"", var->name);
                 }
+            } else if (var->init) {
+                /* Global variable with initializer */
+                if (var->ty->kind == TY_ARRAY) {
+                    /* Array initializer */
+                    Type *elem_ty = var->ty->base;
+                    for (Initializer *init = var->init->children; init; init = init->next) {
+                        if (elem_ty->kind == TY_PTR || elem_ty->kind == TY_ARRAY) {
+                            /* Pointer or array element - emit as quad (8 bytes) */
+                            if (init->is_expr && init->expr->kind == ND_VAR) {
+                                /* Pointer to string literal or global */
+                                emit("  .quad %s", init->expr->var->name);
+                            } else {
+                                emit("  .quad 0");
+                            }
+                        } else if (elem_ty->kind == TY_INT) {
+                            /* Integer element - emit as long (4 bytes) */
+                            if (init->is_expr && init->expr->kind == ND_NUM) {
+                                emit("  .long %d", init->expr->val);
+                            } else {
+                                emit("  .long 0");
+                            }
+                        } else if (elem_ty->kind == TY_CHAR) {
+                            /* Char element - emit as byte */
+                            if (init->is_expr && init->expr->kind == ND_NUM) {
+                                emit("  .byte %d", init->expr->val);
+                            } else {
+                                emit("  .byte 0");
+                            }
+                        } else {
+                            /* Unknown type - use zero */
+                            emit("  .zero %d", elem_ty->size);
+                        }
+                    }
+                } else {
+                    /* Simple initializer - for now, zero it */
+                    emit("  .zero %d", var->ty->size);
+                }
             } else {
+                /* No initializer - zero fill */
                 emit("  .zero %d", var->ty->size);
             }
         }

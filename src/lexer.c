@@ -118,23 +118,24 @@ static Token *new_token(TokenKind kind, char *str, int len) {
 
 /* Check if identifier is keyword */
 static TokenKind check_keyword(char *str, int len) {
-    struct {
-        char *name;
-        TokenKind kind;
-    } keywords[] = {
-        {"int", TK_INT}, {"char", TK_CHAR}, {"void", TK_VOID},
-        {"if", TK_IF}, {"else", TK_ELSE}, {"while", TK_WHILE},
-        {"for", TK_FOR}, {"return", TK_RETURN}, {"sizeof", TK_SIZEOF},
-        {"struct", TK_STRUCT}, {"typedef", TK_TYPEDEF}, {"enum", TK_ENUM},
-        {"static", TK_STATIC}, {"extern", TK_EXTERN}, {"const", TK_CONST},
-        {"break", TK_BREAK}, {"continue", TK_CONTINUE},
-        {"switch", TK_SWITCH}, {"case", TK_CASE}, {"default", TK_DEFAULT},
+    /* Use parallel arrays instead of struct array for self-hosting compatibility */
+    static char *keyword_names[] = {
+        "int", "char", "void", "if", "else", "while",
+        "for", "return", "sizeof", "struct", "typedef", "enum",
+        "static", "extern", "const", "break", "continue",
+        "switch", "case", "default"
+    };
+    static TokenKind keyword_kinds[] = {
+        TK_INT, TK_CHAR, TK_VOID, TK_IF, TK_ELSE, TK_WHILE,
+        TK_FOR, TK_RETURN, TK_SIZEOF, TK_STRUCT, TK_TYPEDEF, TK_ENUM,
+        TK_STATIC, TK_EXTERN, TK_CONST, TK_BREAK, TK_CONTINUE,
+        TK_SWITCH, TK_CASE, TK_DEFAULT
     };
     
-    for (int i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
-        if (strlen(keywords[i].name) == len && 
-            strncmp(str, keywords[i].name, len) == 0) {
-            return keywords[i].kind;
+    for (int i = 0; i < sizeof(keyword_names) / sizeof(keyword_names[0]); i++) {
+        if (strlen(keyword_names[i]) == len && 
+            strncmp(str, keyword_names[i], len) == 0) {
+            return keyword_kinds[i];
         }
     }
     return TK_IDENT;
