@@ -31,8 +31,14 @@ make
 # 运行测试
 make test
 
-# 自举测试
+# 自举测试（基础）
 make bootstrap
+
+# 自举测试（多阶段）
+make bootstrap-stage1    # 尝试用编译器编译自己（阶段1）
+make bootstrap-stage2    # 用阶段1编译器编译自己（阶段2）
+make bootstrap-full      # 完整的3阶段自举验证
+make bootstrap-test      # 用自举编译器运行测试套件
 
 # 安装（可选）
 sudo make install
@@ -106,17 +112,32 @@ make test
 
 ## 自举验证
 
-编译器可以编译自己的源代码：
+编译器提供了多个自举测试选项：
 
 ```bash
+# 基础自举测试 - 验证编译器能编译简单程序
 make bootstrap
+
+# 阶段1自举 - 尝试用GCC编译的编译器来编译自己
+make bootstrap-stage1
+
+# 阶段2自举 - 用阶段1编译器编译自己
+make bootstrap-stage2
+
+# 完整自举 - 3阶段验证，确认阶段1和阶段2生成相同结果
+make bootstrap-full
+
+# 自举测试 - 用自举编译器运行所有测试
+make bootstrap-test
 ```
 
 自举过程：
-1. 使用GCC编译编译器（第一阶段）
-2. 使用第一阶段编译器编译自己（第二阶段）
-3. 使用第二阶段编译器编译自己（第三阶段）
-4. 验证第二阶段和第三阶段的编译器二进制文件相同
+1. 阶段0：使用GCC编译编译器（mycc-stage0）
+2. 阶段1：使用mycc-stage0编译自己（mycc-stage1）
+3. 阶段2：使用mycc-stage1编译自己（mycc-stage2）
+4. 验证：确认mycc-stage1和mycc-stage2生成相同的输出
+
+**当前状态**：基础自举测试通过，完整自举需要实现额外的C特性（如typedef、enum等）。详见`docs/SELF_HOSTING.md`。
 
 ## 技术文档
 
@@ -166,7 +187,8 @@ Compiler/
 - [x] 多文件支持
 - [x] 测试套件
 - [x] 技术文档
-- [ ] 完整的自举测试（待完善）
+- [x] 多阶段自举框架（Makefile提供完整的自举选项）
+- [ ] 完整的自举测试（需要实现typedef、enum等特性）
 
 ## 已知限制
 
