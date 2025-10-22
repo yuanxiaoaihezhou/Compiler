@@ -16,12 +16,14 @@ static void emit(char *fmt, ...) {
     va_end(ap);
 }
 
+/* Register name lookup tables (global for self-hosting compatibility) */
+static char *regs64[] = {"rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9", "r10", "r11"};
+static char *regs32[] = {"eax", "edi", "esi", "edx", "ecx", "r8d", "r9d", "r10d", "r11d"};
+static char *regs8[] = {"al", "dil", "sil", "dl", "cl", "r8b", "r9b", "r10b", "r11b"};
+static char *argregs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+
 /* Get register name */
 static char *reg_name(int r, int size) {
-    static char *regs64[] = {"rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9", "r10", "r11"};
-    static char *regs32[] = {"eax", "edi", "esi", "edx", "ecx", "r8d", "r9d", "r10d", "r11d"};
-    static char *regs8[] = {"al", "dil", "sil", "dl", "cl", "r8b", "r9b", "r10b", "r11b"};
-    
     if (r < 0 || r >= 9) {
         return "rax";
     }
@@ -140,7 +142,6 @@ static void gen_expr_asm(ASTNode *node) {
             }
             
             /* Generate code for arguments */
-            char *argregs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
             for (i = 0; i < nargs && i < 6; i++) {
                 gen_expr_asm(args[i]);
                 push("rax");
@@ -436,7 +437,6 @@ static void gen_function_asm(Symbol *fn) {
     emit("  sub rsp, %d", fn->stack_size);
     
     /* Save parameters to stack */
-    char *argregs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
     int i = 0;
     for (Symbol *param = fn->params; param && i < 6; param = param->next, i++) {
         /* Find this parameter in locals to get its offset */
