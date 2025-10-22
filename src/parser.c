@@ -273,6 +273,13 @@ static ASTNode *postfix(Token **rest, Token *tok) {
     }
 }
 
+/* Check if token is a type keyword */
+static bool is_typename(Token *tok) {
+    return tok->kind == TK_INT || tok->kind == TK_CHAR || tok->kind == TK_VOID ||
+           tok->kind == TK_STRUCT || tok->kind == TK_ENUM ||
+           (tok->kind == TK_IDENT && find_typedef(tok));
+}
+
 /* Parse unary expression */
 static ASTNode *unary(Token **rest, Token *tok) {
     if (equal(tok, "+")) {
@@ -307,6 +314,24 @@ static ASTNode *unary(Token **rest, Token *tok) {
         ASTNode *size_node = new_num(node->ty->size);
         return size_node;
     }
+    
+    /* Cast expression: (type)expr */
+    if (equal(tok, "(") && is_typename(tok->next)) {
+        Token *start = tok;
+        tok = tok->next;
+        
+        /* Parse type */
+        DeclSpec *spec = declspec(&tok, tok);
+        Type *ty = declarator(&tok, tok, spec->ty);
+        tok = skip(tok, ")");
+        
+        /* Parse the expression being cast */
+        ASTNode *node = new_node(ND_CAST);
+        node->ty = ty;
+        node->lhs = unary(rest, tok);
+        return node;
+    }
+    
     return postfix(rest, tok);
 }
 
