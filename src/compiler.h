@@ -22,6 +22,7 @@ typedef enum {
     TK_INT, TK_CHAR, TK_VOID, TK_IF, TK_ELSE, TK_WHILE, TK_FOR, 
     TK_RETURN, TK_SIZEOF, TK_STRUCT, TK_TYPEDEF, TK_ENUM,
     TK_STATIC, TK_EXTERN, TK_CONST, TK_BREAK, TK_CONTINUE,
+    TK_SWITCH, TK_CASE, TK_DEFAULT,
     
     /* Identifiers and literals */
     TK_IDENT, TK_NUM, TK_STR, TK_CHAR_LIT,
@@ -37,7 +38,7 @@ typedef enum {
     /* Punctuation */
     TK_LPAREN, TK_RPAREN, TK_LBRACE, TK_RBRACE,
     TK_LBRACKET, TK_RBRACKET, TK_SEMICOLON, TK_COMMA,
-    TK_QUESTION, TK_COLON,
+    TK_QUESTION, TK_COLON, TK_ELLIPSIS,
     
     /* Special */
     TK_EOF, TK_NEWLINE
@@ -65,7 +66,8 @@ typedef enum {
     ND_LAND, ND_LOR, ND_LNOT,
     ND_AND, ND_OR, ND_XOR, ND_SHL, ND_SHR,
     ND_MEMBER, ND_CAST, ND_SIZEOF, ND_COMMA,
-    ND_COND, ND_BREAK, ND_CONTINUE
+    ND_COND, ND_BREAK, ND_CONTINUE,
+    ND_SWITCH, ND_CASE
 } NodeKind;
 
 /* Type kinds */
@@ -127,6 +129,12 @@ struct ASTNode {
     
     /* For ND_MEMBER */
     Member *member;
+    
+    /* For ND_SWITCH, ND_CASE */
+    ASTNode *case_next;  /* Next case in switch */
+    ASTNode *default_case; /* Default case */
+    char *brk_label;     /* Break label for switch/loop */
+    char *cont_label;    /* Continue label for loop */
 };
 
 /* Symbol (variable/function) */
@@ -145,6 +153,7 @@ struct Symbol {
     bool is_static;    /* Static storage class */
     bool is_extern;    /* External linkage */
     int enum_val;      /* For enum constants */
+    bool is_variadic;  /* Is this a variadic function? */
 };
 
 /* Intermediate representation */
@@ -219,6 +228,7 @@ bool consume(Token **rest, Token *tok, char *op);
 bool equal(Token *tok, char *op);
 Token *skip(Token *tok, char *op);
 char *strndup_custom(const char *s, size_t n);
+char *strdup_custom(const char *s);
 
 /* Global state */
 extern CompilerState *compiler_state;

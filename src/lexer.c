@@ -128,6 +128,7 @@ static TokenKind check_keyword(char *str, int len) {
         {"struct", TK_STRUCT}, {"typedef", TK_TYPEDEF}, {"enum", TK_ENUM},
         {"static", TK_STATIC}, {"extern", TK_EXTERN}, {"const", TK_CONST},
         {"break", TK_BREAK}, {"continue", TK_CONTINUE},
+        {"switch", TK_SWITCH}, {"case", TK_CASE}, {"default", TK_DEFAULT},
     };
     
     for (int i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
@@ -245,6 +246,11 @@ Token *tokenize(char *input, char *filename) {
         if (startswith(p, "-=")) {
             cur = cur->next = new_token(TK_MINUS_ASSIGN, p, 2);
             p += 2;
+            continue;
+        }
+        if (startswith(p, "...")) {
+            cur = cur->next = new_token(TK_ELLIPSIS, p, 3);
+            p += 3;
             continue;
         }
         
