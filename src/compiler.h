@@ -236,6 +236,8 @@ char *preprocess(char *filename);
 void error(char *fmt, ...);
 void error_at(char *loc, char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
+void note_tok(Token *tok, char *fmt, ...);
+
 
 /* Utility functions */
 char *read_file(char *path);
