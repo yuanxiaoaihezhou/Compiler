@@ -268,6 +268,35 @@ static ASTNode *postfix(Token **rest, Token *tok) {
             continue;
         }
         
+        /* Postfix increment: x++ 
+         * Since we can't easily create temporaries, we approximate as:
+         * In simple cases like arr[i++], this becomes: arr[i], then i = i + 1
+         * For expressions that use the value, we'd need proper temp support.
+         * For now, we'll just do: (x = x + 1) - 1 which works for most cases.
+         */
+        if (tok->kind == TK_INC) {
+            add_type(node);
+            ASTNode *one = new_num(1);
+            /* Create: (x = x + 1) - 1 */
+            /* This evaluates the new value then subtracts 1 to get old value */
+            ASTNode *new_val = new_binary(ND_ADD, copy_node(node), one);
+            ASTNode *assign = new_binary(ND_ASSIGN, node, new_val);
+            node = new_binary(ND_SUB, assign, new_num(1));
+            tok = tok->next;
+            continue;
+        }
+        
+        /* Postfix decrement: x-- becomes (x = x - 1) + 1 */
+        if (tok->kind == TK_DEC) {
+            add_type(node);
+            ASTNode *one = new_num(1);
+            ASTNode *new_val = new_binary(ND_SUB, copy_node(node), one);
+            ASTNode *assign = new_binary(ND_ASSIGN, node, new_val);
+            node = new_binary(ND_ADD, assign, new_num(1));
+            tok = tok->next;
+            continue;
+        }
+        
         *rest = tok;
         return node;
     }
@@ -308,6 +337,27 @@ static ASTNode *unary(Token **rest, Token *tok) {
         node->lhs = unary(rest, tok->next);
         return node;
     }
+    
+    /* Prefix increment: ++x becomes x = x + 1 */
+    if (tok->kind == TK_INC) {
+        ASTNode *operand = unary(&tok, tok->next);
+        add_type(operand);
+        ASTNode *one = new_num(1);
+        ASTNode *new_val = new_binary(ND_ADD, operand, one);
+        *rest = tok;
+        return new_binary(ND_ASSIGN, copy_node(operand), new_val);
+    }
+    
+    /* Prefix decrement: --x becomes x = x - 1 */
+    if (tok->kind == TK_DEC) {
+        ASTNode *operand = unary(&tok, tok->next);
+        add_type(operand);
+        ASTNode *one = new_num(1);
+        ASTNode *new_val = new_binary(ND_SUB, operand, one);
+        *rest = tok;
+        return new_binary(ND_ASSIGN, copy_node(operand), new_val);
+    }
+    
     if (tok->kind == TK_SIZEOF) {
         ASTNode *node = unary(rest, tok->next);
         add_type(node);
@@ -557,8 +607,64 @@ static ASTNode *stmt(Token **rest, Token *tok) {
         ASTNode *node = new_node(ND_FOR);
         tok = skip(tok->next, "(");
         
+        /* Check if init is a declaration (C99 style) */
         if (!equal(tok, ";")) {
-            node->init = expr_stmt(&tok, tok);
+            /* Check if it looks like a declaration */
+            bool is_decl = (tok->kind == TK_INT || tok->kind == TK_CHAR || 
+                           tok->kind == TK_VOID || tok->kind == TK_STATIC ||
+                           tok->kind == TK_EXTERN || tok->kind == TK_CONST ||
+                           tok->kind == TK_TYPEDEF || tok->kind == TK_ENUM ||
+                           tok->kind == TK_STRUCT ||
+                           (tok->kind == TK_IDENT && find_typedef(tok)));
+            
+            if (is_decl) {
+                /* Parse declaration as init - simplified version */
+                DeclSpec *spec = declspec(&tok, tok);
+                Type *basety = spec->ty;
+                
+                /* Parse declarator */
+                Type *ty = declarator(&tok, tok, basety);
+                
+                if (tok->kind != TK_IDENT) {
+                    error_tok(tok, "expected variable name in for loop");
+                }
+                
+                char *name = strndup_custom(tok->str, tok->len);
+                tok = tok->next;
+                
+                /* Handle array declarator */
+                if (equal(tok, "[")) {
+                    tok = tok->next;
+                    int len = 0;
+                    if (tok->kind == TK_NUM) {
+                        len = tok->val;
+                        tok = tok->next;
+                    }
+                    tok = skip(tok, "]");
+                    ty = array_of(ty, len);
+                }
+                
+                /* Create local variable */
+                Symbol *var = new_lvar(name, ty);
+                var->is_static = spec->is_static;
+                var->is_extern = spec->is_extern;
+                
+                /* Parse initializer if present */
+                if (equal(tok, "=")) {
+                    tok = tok->next;
+                    ASTNode *var_node = new_node(ND_VAR);
+                    var_node->var = var;
+                    ASTNode *init_expr = expr(&tok, tok);
+                    ASTNode *assign = new_binary(ND_ASSIGN, var_node, init_expr);
+                    node->init = new_node(ND_EXPR_STMT);
+                    node->init->lhs = assign;
+                }
+                
+                tok = skip(tok, ";");
+            } else {
+                /* Regular expression init */
+                node->init = expr_stmt(&tok, tok);
+            }
         } else {
             tok = tok->next;
         }

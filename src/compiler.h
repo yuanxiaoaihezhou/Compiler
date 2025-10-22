@@ -213,6 +213,7 @@ Initializer *parse_initializer(Token **rest, Token *tok, Type *ty);
 ASTNode *new_node(NodeKind kind);
 ASTNode *new_binary(NodeKind kind, ASTNode *lhs, ASTNode *rhs);
 ASTNode *new_num(int val);
+ASTNode *copy_node(ASTNode *node);
 
 /* Type functions */
 Type *new_type(TypeKind kind, int size, int align);

@@ -22,6 +22,19 @@ ASTNode *new_num(int val) {
     return node;
 }
 
+/* Copy AST node (shallow copy for simple cases) */
+ASTNode *copy_node(ASTNode *node) {
+    if (!node) return NULL;
+    
+    ASTNode *copy = calloc(1, sizeof(ASTNode));
+    memcpy(copy, node, sizeof(ASTNode));
+    
+    /* For safety, don't copy next pointer */
+    copy->next = NULL;
+    
+    return copy;
+}
+
 /* Create new type */
 Type *new_type(TypeKind kind, int size, int align) {
     Type *ty = calloc(1, sizeof(Type));
