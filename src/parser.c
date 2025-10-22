@@ -774,6 +774,24 @@ Initializer *parse_initializer(Token **rest, Token *tok, Type *ty) {
     if (equal(tok, "{")) {
         tok = tok->next;
         
+        /* Check for zero initializer: {0} */
+        bool is_zero_init = false;
+        if (tok->kind == TK_NUM && tok->val == 0) {
+            Token *next = tok->next;
+            if (equal(next, "}")) {
+                is_zero_init = true;
+                tok = next;
+            }
+        }
+        
+        if (is_zero_init) {
+            /* Zero initializer - all elements/fields set to 0 */
+            /* For now, we don't generate any initialization code */
+            /* Local variables are already zeroed by the stack allocation */
+            *rest = skip(tok, "}");
+            return init;
+        }
+        
         /* Handle array type */
         if (ty->kind == TY_ARRAY) {
             int i = 0;

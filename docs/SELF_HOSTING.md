@@ -9,6 +9,9 @@ The compiler can successfully compile and run a variety of C programs, as demons
 ✓ Basic data types: `int`, `char`, `void`
 ✓ Pointers and pointer arithmetic
 ✓ Arrays (basic)
+✓ Array initializers: `int arr[3] = {1, 2, 3}`
+✓ Zero initializer: `int arr[5] = {0}`
+✓ Array decay to pointer
 ✓ Functions with parameters and return values
 ✓ Local and global variables
 ✓ Arithmetic operators: `+`, `-`, `*`, `/`, `%`
@@ -22,6 +25,10 @@ The compiler can successfully compile and run a variety of C programs, as demons
 ✓ Comments (line and block)
 ✓ String and character literals
 ✓ Basic preprocessor (`#include`)
+✓ `typedef` - type aliasing
+✓ `enum` - enumeration types
+✓ `static`, `extern`, `const` keywords (parsing)
+✓ `switch`/`case`/`default` statements
 
 ## Missing Features for Full Self-Hosting
 
@@ -35,13 +42,16 @@ The following features are used in the compiler source but not yet implemented:
 - [x] `const` keyword ✓ IMPLEMENTED (parsing only)
 - [x] `switch`/`case`/`default` statements ✓ IMPLEMENTED (basic support, tested)
 - [x] Variadic functions (`...`) ✓ IMPLEMENTED (parsing support, tested)
+- [x] Array initializers (`{1, 2, 3}`) ✓ IMPLEMENTED (local arrays)
+- [x] Zero initializer (`{0}`) ✓ IMPLEMENTED (parsing support)
+- [x] Pointer arithmetic scaling ✓ IMPLEMENTED
+- [x] Array decay to pointer ✓ IMPLEMENTED
 
 ### Critical Features (Still Needed for Full Self-Hosting)
-- [ ] Brace initializers (`{0}`, `{.field = value}`) - **Used in compiler source**
-- [ ] Array initializers - **Used for string arrays**
-- [ ] Struct member initialization
-- [ ] Global variable initialization with non-constant values
-- [ ] String concatenation
+- [ ] String array initializers (`char *arr[] = {"str1", "str2"}`) - **Used in compiler source**
+- [ ] Array of struct initializers - **Used for keywords array**
+- [ ] Global variable initialization with brace initializers
+- [ ] String literal storage in .data/.rodata section
 - [ ] Cast expressions
 - [ ] Compound literals
 - [ ] Designated initializers
@@ -178,5 +188,9 @@ All basic functionality tests pass:
 - ✓ test_08_pointer - Pointer operations
 - ✓ test_09_comparison - Comparisons
 - ✓ test_10_recursion - Recursive functions
+- ✓ test_11_typedef_enum - Typedef and enum
+- ✓ test_12_switch - Switch/case statements
+- ✓ test_13_variadic - Variadic function parsing
+- ✓ test_14_initializer - Array initializers
 
 This demonstrates that the compiler can handle a useful subset of C, sufficient for many programs.
