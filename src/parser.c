@@ -663,13 +663,7 @@ static DeclSpec *declspec(Token **rest, Token *tok) {
                     error_tok(tok, "expected enum constant name");
                 }
                 
-                /* Create enum constant */
-                Symbol *e = calloc(1, sizeof(Symbol));
-                e->name = strndup_custom(tok->str, tok->len);
-                e->enum_val = val;
-                e->next = enums;
-                enums = e;
-                
+                char *name = strndup_custom(tok->str, tok->len);
                 tok = tok->next;
                 
                 /* Check for explicit value */
@@ -681,6 +675,13 @@ static DeclSpec *declspec(Token **rest, Token *tok) {
                     val = tok->val;
                     tok = tok->next;
                 }
+                
+                /* Create enum constant with current value */
+                Symbol *e = calloc(1, sizeof(Symbol));
+                e->name = name;
+                e->enum_val = val;
+                e->next = enums;
+                enums = e;
                 
                 val++;
                 
@@ -913,10 +914,12 @@ Symbol *parse(Token *tok) {
             }
             
             /* Global variable declaration */
+            bool first_var = true;
             while (!equal(tok, ";")) {
-                if (cur != &head) {
+                if (!first_var) {
                     tok = skip(tok, ",");
                 }
+                first_var = false;
                 
                 Type *ty = declarator(&tok, tok, spec->ty);
                 
