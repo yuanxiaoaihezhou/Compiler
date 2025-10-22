@@ -236,13 +236,15 @@ char *preprocess(char *filename);
 void error(char *fmt, ...);
 void error_at(char *loc, char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
+void note_tok(Token *tok, char *fmt, ...);
+
 
 /* Utility functions */
 char *read_file(char *path);
 bool consume(Token **rest, Token *tok, char *op);
 bool equal(Token *tok, char *op);
 Token *skip(Token *tok, char *op);
-char *strndup_custom(const char *s, size_t n);
+char *strndup_custom(const char *s, int n);
 char *strdup_custom(const char *s);
 
 /* Global state */

@@ -54,7 +54,7 @@ Token *skip(Token *tok, char *op) {
 }
 
 /* String duplication */
-char *strndup_custom(const char *s, size_t n) {
+char *strndup_custom(const char *s, int n) {
     char *new = malloc(n + 1);
     if (new) {
         memcpy(new, s, n);

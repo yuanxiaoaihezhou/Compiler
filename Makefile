@@ -29,7 +29,7 @@ COMPILER = $(BUILD_DIR)/mycc
 # Test files
 TEST_SRCS = $(wildcard $(TEST_DIR)/*.c)
 
-.PHONY: all clean test doc bootstrap bootstrap-stage1 bootstrap-stage2 bootstrap-full bootstrap-test install
+.PHONY: all clean test doc bootstrap bootstrap-stage1 bootstrap-stage2 bootstrap-full bootstrap-test install bootstrap-modular bootstrap-stage1-modular
 
 all: $(COMPILER)
 
@@ -68,6 +68,45 @@ bootstrap: $(COMPILER)
 	@echo "For multi-stage bootstrap, use: make bootstrap-stage1, bootstrap-stage2, or bootstrap-full"
 	@echo "See docs/SELF_HOSTING.md for details on full self-hosting status."
 	@cp $(BUILD_DIR)/mycc-stage0 $(COMPILER)
+
+# Bootstrap Stage 1: compile compiler with GCC-compiled compiler (modular approach)
+bootstrap-stage1-modular: $(COMPILER)
+	@echo "Bootstrap Stage 1 (Modular) - Compile with stage 0"
+	@echo "===================================================="
+	@echo "Building stage 0 compiler with GCC..."
+	@mkdir -p $(BUILD_DIR)/bootstrap
+	@cp $(COMPILER) $(BUILD_DIR)/mycc-stage0
+	@echo ""
+	@echo "Compiling each source file separately with mycc-stage0..."
+	@SUCCESS=true; \
+	for src in $(SRCS); do \
+		obj=$$(basename $$src .c).o; \
+		echo -n "  Compiling $$src -> $(BUILD_DIR)/bootstrap/$$obj ... "; \
+		if $(BUILD_DIR)/mycc-stage0 -I $(SRC_DIR) -c $$src -o $(BUILD_DIR)/bootstrap/$$obj 2>$(BUILD_DIR)/bootstrap/$${obj}.log; then \
+			echo "✓"; \
+		else \
+			echo "✗"; \
+			echo "    Error log: $(BUILD_DIR)/bootstrap/$${obj}.log"; \
+			cat $(BUILD_DIR)/bootstrap/$${obj}.log | head -10; \
+			SUCCESS=false; \
+			break; \
+		fi; \
+	done; \
+	if [ "$$SUCCESS" = "true" ]; then \
+		echo ""; \
+		echo "Linking object files..."; \
+		gcc $(BUILD_DIR)/bootstrap/*.o -o $(BUILD_DIR)/mycc-stage1 2>$(BUILD_DIR)/bootstrap-link.log && \
+		echo "✓ Stage 1 compilation and linking succeeded!" && \
+		echo "Testing stage 1 compiler..." && \
+		$(BUILD_DIR)/mycc-stage1 tests/test_01_return.c -o $(BUILD_DIR)/test_stage1 && \
+		$(BUILD_DIR)/test_stage1 && test $$? -eq 42 && \
+		echo "✓ Stage 1 compiler is functional!"; \
+	else \
+		echo ""; \
+		echo "✗ Stage 1 compilation failed"; \
+		echo "See error logs in $(BUILD_DIR)/bootstrap/"; \
+		exit 1; \
+	fi
 
 # Bootstrap Stage 1: compile compiler with GCC-compiled compiler
 bootstrap-stage1: $(COMPILER)

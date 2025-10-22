@@ -483,7 +483,8 @@ void codegen(Symbol *prog, FILE *out) {
     
     /* Generate code for functions */
     for (Symbol *fn = prog; fn; fn = fn->next) {
-        if (fn->is_function) {
+        if (fn->is_function && fn->body) {
+            /* Only generate code for functions with bodies (not declarations) */
             gen_function_asm(fn);
         }
     }

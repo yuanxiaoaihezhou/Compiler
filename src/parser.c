@@ -1137,6 +1137,13 @@ static void parse_params(Token **rest, Token *tok, Symbol *fn) {
         return;
     }
     
+    /* Handle void parameter (no parameters) */
+    if (tok->kind == TK_VOID && equal(tok->next, ")")) {
+        tok = tok->next;
+        *rest = tok->next;
+        return;
+    }
+    
     Symbol head = {0};
     Symbol *cur = &head;
     
@@ -1172,7 +1179,7 @@ static void parse_params(Token **rest, Token *tok, Symbol *fn) {
     *rest = tok->next;
 }
 
-/* Parse function definition */
+/* Parse function definition or declaration */
 static Symbol *function(Token **rest, Token *tok) {
     locals = NULL;
     
@@ -1188,6 +1195,15 @@ static Symbol *function(Token **rest, Token *tok) {
     
     parse_params(&tok, tok, fn);
     
+    /* Check if this is a declaration (prototype) or definition */
+    if (equal(tok, ";")) {
+        /* Function declaration - no body */
+        fn->body = NULL;
+        *rest = tok->next;
+        return fn;
+    }
+    
+    /* Function definition - has body */
     /* Add parameters to locals */
     for (Symbol *param = fn->params; param; param = param->next) {
         Symbol *local = calloc(1, sizeof(Symbol));

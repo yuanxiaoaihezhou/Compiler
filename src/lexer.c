@@ -323,7 +323,9 @@ Token *tokenize(char *input, char *filename) {
             continue;
         }
         
-        error("invalid token at '%c'", *p);
+        fprintf(stderr, "\033[1m%s:%d: \033[31merror:\033[0m invalid token at '%c'\n", 
+                filename, current_line, *p);
+        exit(1);
     }
     
     cur = cur->next = new_token(TK_EOF, p, 0);
