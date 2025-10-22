@@ -209,6 +209,9 @@ static void process_include(char *line, char *output, int *out_len) {
         /* For certain headers, output necessary typedefs and function declarations */
         if (strcmp(filename, "stdio.h") == 0 || strstr(filename, "stdio.h")) {
             const char *stdio_defs = "\ntypedef int FILE;\n"
+                "extern int stderr;\n"
+                "extern int stdout;\n"
+                "extern int stdin;\n"
                 "int printf(char *fmt, ...);\n"
                 "int fprintf(int stream, char *fmt, ...);\n"
                 "int sprintf(char *str, char *fmt, ...);\n"
@@ -226,6 +229,68 @@ static void process_include(char *line, char *output, int *out_len) {
                 "int puts(char *s);\n";
             int len = strlen(stdio_defs);
             memcpy(output + *out_len, stdio_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
+            /* Add NULL define for convenience */
+            add_define("NULL", "((void*)0)");
+        } else if (strcmp(filename, "stdlib.h") == 0 || strstr(filename, "stdlib.h")) {
+            const char *stdlib_defs = "\n"
+                "int malloc(int size);\n"
+                "int calloc(int nmemb, int size);\n"
+                "int realloc(int ptr, int size);\n"
+                "void free(int ptr);\n"
+                "void exit(int status);\n"
+                "int atoi(char *str);\n"
+                "int system(char *command);\n";
+            int len = strlen(stdlib_defs);
+            memcpy(output + *out_len, stdlib_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
+        } else if (strcmp(filename, "string.h") == 0 || strstr(filename, "string.h")) {
+            const char *string_defs = "\n"
+                "int strlen(char *s);\n"
+                "int strcmp(char *s1, char *s2);\n"
+                "int strncmp(char *s1, char *s2, int n);\n"
+                "char *strcpy(char *dest, char *src);\n"
+                "char *strncpy(char *dest, char *src, int n);\n"
+                "char *strcat(char *dest, char *src);\n"
+                "char *strchr(char *s, int c);\n"
+                "char *strstr(char *haystack, char *needle);\n"
+                "char *strdup(char *s);\n"
+                "int memcpy(int dest, int src, int n);\n"
+                "int memset(int s, int c, int n);\n"
+                "int memcmp(int s1, int s2, int n);\n";
+            int len = strlen(string_defs);
+            memcpy(output + *out_len, string_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
+        } else if (strcmp(filename, "ctype.h") == 0 || strstr(filename, "ctype.h")) {
+            const char *ctype_defs = "\n"
+                "int isspace(int c);\n"
+                "int isalpha(int c);\n"
+                "int isalnum(int c);\n"
+                "int isdigit(int c);\n"
+                "int isupper(int c);\n"
+                "int islower(int c);\n"
+                "int toupper(int c);\n"
+                "int tolower(int c);\n";
+            int len = strlen(ctype_defs);
+            memcpy(output + *out_len, ctype_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
+        } else if (strcmp(filename, "stdarg.h") == 0 || strstr(filename, "stdarg.h")) {
+            const char *stdarg_defs = "\ntypedef int va_list;\n";
+            int len = strlen(stdarg_defs);
+            memcpy(output + *out_len, stdarg_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
+            /* Note: va_start, va_arg, va_end are compiler built-ins */
+        } else if (strcmp(filename, "errno.h") == 0 || strstr(filename, "errno.h")) {
+            /* Skip errno.h - not needed for bootstrap */
+        } else if (strcmp(filename, "unistd.h") == 0 || strstr(filename, "unistd.h")) {
+            const char *unistd_defs = "\nint unlink(char *pathname);\n";
+            int len = strlen(unistd_defs);
+            memcpy(output + *out_len, unistd_defs, len);
             *out_len += len;
             output[*out_len] = '\0';
         } else if (strcmp(filename, "stdbool.h") == 0 || strstr(filename, "stdbool.h")) {
