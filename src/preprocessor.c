@@ -75,6 +75,60 @@ static char *find_include_file(char *filename) {
     return NULL;
 }
 
+/* Get macro value */
+static char *get_define(const char *name) {
+    for (int i = 0; i < define_count; i++) {
+        if (strcmp(defines[i].name, name) == 0) {
+            return defines[i].value;
+        }
+    }
+    return NULL;
+}
+
+/* Expand macros in a line */
+static char *expand_macros(char *line) {
+    static char expanded[4096];
+    char *out = expanded;
+    char *p = line;
+    
+    while (*p) {
+        /* Check if this could be an identifier */
+        if (isalpha(*p) || *p == '_') {
+            char *id_start = p;
+            while (isalnum(*p) || *p == '_') p++;
+            
+            int id_len = p - id_start;
+            char id[256];
+            if (id_len < 256) {
+                strncpy(id, id_start, id_len);
+                id[id_len] = '\0';
+                
+                /* Check if it's a defined macro */
+                char *value = get_define(id);
+                if (value) {
+                    /* Replace with macro value */
+                    strcpy(out, value);
+                    out += strlen(value);
+                } else {
+                    /* Copy identifier as is */
+                    strncpy(out, id_start, id_len);
+                    out += id_len;
+                }
+            } else {
+                /* Identifier too long, copy as is */
+                strncpy(out, id_start, id_len);
+                out += id_len;
+            }
+        } else {
+            /* Copy character as is */
+            *out++ = *p++;
+        }
+    }
+    
+    *out = '\0';
+    return strdup_custom(expanded);
+}
+
 /* Check if macro is defined */
 static bool is_defined(const char *name) {
     for (int i = 0; i < define_count; i++) {
@@ -122,7 +176,8 @@ static void process_include(char *line, char *output, int *out_len) {
         p++;
         char *end = strchr(p, '"');
         if (!end) {
-            error("unclosed include directive");
+            fprintf(stderr, "\033[1m\033[33mwarning:\033[0m unclosed include directive\n");
+            return;
         }
         filename = strndup_custom(p, end - p);
     } else if (*p == '<') {
@@ -131,11 +186,13 @@ static void process_include(char *line, char *output, int *out_len) {
         p++;
         char *end = strchr(p, '>');
         if (!end) {
-            error("unclosed include directive");
+            fprintf(stderr, "\033[1m\033[33mwarning:\033[0m unclosed include directive\n");
+            return;
         }
         filename = strndup_custom(p, end - p);
     } else {
         /* Skip malformed include */
+        fprintf(stderr, "\033[1m\033[33mwarning:\033[0m malformed #include directive\n");
         return;
     }
     
@@ -143,15 +200,21 @@ static void process_include(char *line, char *output, int *out_len) {
     if (is_system_header) {
         /* For certain headers, output necessary typedefs */
         if (strcmp(filename, "stdbool.h") == 0 || strstr(filename, "stdbool.h")) {
-            const char *bool_defs = "\ntypedef int bool;\n";
+            const char *bool_defs = "\ntypedef int bool;\n#define true 1\n#define false 0\n";
             int len = strlen(bool_defs);
             memcpy(output + *out_len, bool_defs, len);
             *out_len += len;
             output[*out_len] = '\0';
         } else if (strcmp(filename, "stddef.h") == 0 || strstr(filename, "stddef.h")) {
-            const char *stddef_defs = "\ntypedef unsigned long size_t;\ntypedef long ptrdiff_t;\n";
+            const char *stddef_defs = "\ntypedef unsigned long size_t;\ntypedef long ptrdiff_t;\n#define NULL ((void*)0)\n";
             int len = strlen(stddef_defs);
             memcpy(output + *out_len, stddef_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
+        } else if (strcmp(filename, "stdint.h") == 0 || strstr(filename, "stdint.h")) {
+            const char *stdint_defs = "\ntypedef int int32_t;\ntypedef unsigned int uint32_t;\ntypedef long int64_t;\ntypedef unsigned long uint64_t;\n";
+            int len = strlen(stdint_defs);
+            memcpy(output + *out_len, stdint_defs, len);
             *out_len += len;
             output[*out_len] = '\0';
         }
@@ -162,18 +225,20 @@ static void process_include(char *line, char *output, int *out_len) {
     
     /* Check include depth */
     if (include_depth >= MAX_INCLUDE_DEPTH) {
-        /* Too deep - skip */
+        fprintf(stderr, "\033[1m\033[33mwarning:\033[0m #include nested too deeply, skipping %s\n", filename);
         free(filename);
         return;
     }
     
     char *path = find_include_file(filename);
-    free(filename);
     
     if (!path) {
-        /* File not found - skip */
+        fprintf(stderr, "\033[1m\033[33mwarning:\033[0m cannot find include file: %s\n", filename);
+        free(filename);
         return;
     }
+    
+    free(filename);
     
     /* Check if already included */
     if (was_included(path)) {
@@ -306,15 +371,24 @@ static char *preprocess_recursive(char *input, int *out_len) {
             }
             /* Skip all other preprocessor directives */
         } else if (skip_depth < 0) {
-            /* Copy line to output if not skipping */
+            /* Expand macros and copy line to output if not skipping */
             int line_len = line_end - line;
-            if (line_len > 0 || *line_end == '\n') {
-                memcpy(output + *out_len, line, line_len);
-                *out_len += line_len;
-                if (*line_end == '\n') {
-                    output[*out_len] = '\n';
-                    (*out_len)++;
-                }
+            if (line_len > 0) {
+                /* Create a null-terminated copy of the line */
+                char *line_copy = strndup_custom(line, line_len);
+                char *expanded = expand_macros(line_copy);
+                int expanded_len = strlen(expanded);
+                
+                memcpy(output + *out_len, expanded, expanded_len);
+                *out_len += expanded_len;
+                
+                free(line_copy);
+                free(expanded);
+            }
+            
+            if (*line_end == '\n') {
+                output[*out_len] = '\n';
+                (*out_len)++;
             }
         }
         
