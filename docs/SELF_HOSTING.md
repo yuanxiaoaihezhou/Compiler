@@ -33,18 +33,20 @@ The following features are used in the compiler source but not yet implemented:
 - [x] `static` keyword ✓ IMPLEMENTED (parsing only)
 - [x] `extern` keyword ✓ IMPLEMENTED (parsing only)
 - [x] `const` keyword ✓ IMPLEMENTED (parsing only)
+- [x] `switch`/`case`/`default` statements ✓ IMPLEMENTED (basic support, tested)
+- [x] Variadic functions (`...`) ✓ IMPLEMENTED (parsing support, tested)
 
-### Critical Features (Still Needed)
-- [ ] `switch`/`case`/`default` statements - **CRITICAL for self-hosting**
-- [ ] Variadic functions (`...`, `va_list`, `va_start`, `va_end`) - **CRITICAL for error functions**
-- [ ] `struct` with member initialization
+### Critical Features (Still Needed for Full Self-Hosting)
+- [ ] Brace initializers (`{0}`, `{.field = value}`) - **Used in compiler source**
+- [ ] Array initializers - **Used for string arrays**
+- [ ] Struct member initialization
 - [ ] Global variable initialization with non-constant values
-- [ ] Array initialization with values
 - [ ] String concatenation
 - [ ] Cast expressions
 - [ ] Compound literals
 - [ ] Designated initializers
 - [ ] `goto` and labels
+- [ ] Full va_list/va_start/va_end support (compiler built-ins)
 
 ### Standard Library Functions
 - [ ] `calloc`, `malloc`, `free` - memory allocation

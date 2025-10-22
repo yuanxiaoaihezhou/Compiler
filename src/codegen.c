@@ -305,6 +305,11 @@ static void gen_stmt_asm(ASTNode *node) {
             /* Evaluate switch expression */
             gen_expr_asm(node->cond);
             
+            /* Switch body must be a compound statement */
+            if (!node->then || node->then->kind != ND_BLOCK) {
+                error("switch statement body must be a compound statement");
+            }
+            
             /* Track case values and their labels */
             #define MAX_CASES 256
             static struct { int val; int label; } case_map[MAX_CASES];

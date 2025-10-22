@@ -141,7 +141,7 @@ make bootstrap-test
 3. 阶段2：使用mycc-stage1编译自己（mycc-stage2）
 4. 验证：确认mycc-stage1和mycc-stage2生成相同的输出
 
-**当前状态**：基础自举测试通过，已实现typedef/enum/static/extern/const等关键特性。完整自举需要实现switch语句和可变参数函数。详见`docs/SELF_HOSTING.md`。
+**当前状态**：基础自举测试通过，已实现typedef/enum/static/extern/const/switch/variadic等关键特性。完整自举还需要实现大括号初始化器等特性。详见`docs/SELF_HOSTING.md`。
 
 ## 技术文档
 
@@ -195,9 +195,10 @@ Compiler/
 - [x] typedef支持（类型别名）
 - [x] enum支持（枚举类型）
 - [x] static/extern/const关键字支持（解析）
-- [ ] switch/case语句（自举所需）
-- [ ] 可变参数函数（自举所需）
-- [ ] 完整的自举测试（需要实现switch和variadic functions）
+- [x] switch/case语句（已实现基础支持）
+- [x] 可变参数函数（已实现参数解析）
+- [ ] 大括号初始化器（自举所需）
+- [ ] 完整的自举测试（需要实现初始化器等特性）
 
 ## 已知限制
 
