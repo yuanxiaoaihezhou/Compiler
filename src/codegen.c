@@ -113,6 +113,16 @@ static void gen_expr_asm(ASTNode *node) {
                 emit("  mov rax, [rax]");
             }
             return;
+        case ND_LNOT:
+            gen_expr_asm(node->lhs);
+            emit("  cmp rax, 0");
+            emit("  sete al");
+            emit("  movzb rax, al");
+            return;
+        case ND_NOT:
+            gen_expr_asm(node->lhs);
+            emit("  not rax");
+            return;
         case ND_ASSIGN:
             gen_addr(node->lhs);
             push("rax");

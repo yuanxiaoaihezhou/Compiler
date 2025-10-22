@@ -112,6 +112,7 @@ static int gen_expr(ASTNode *node) {
         case ND_LAND:
         case ND_LOR:
         case ND_LNOT:
+        case ND_NOT:
             /* For now, treat logical operators as expressions that will be handled in codegen */
             /* This is a simplified approach - just evaluate both sides */
             if (node->lhs) gen_expr(node->lhs);

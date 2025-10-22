@@ -296,6 +296,11 @@ static ASTNode *unary(Token **rest, Token *tok) {
         node->lhs = unary(rest, tok->next);
         return node;
     }
+    if (equal(tok, "~")) {
+        ASTNode *node = new_node(ND_NOT);
+        node->lhs = unary(rest, tok->next);
+        return node;
+    }
     if (tok->kind == TK_SIZEOF) {
         ASTNode *node = unary(rest, tok->next);
         add_type(node);
