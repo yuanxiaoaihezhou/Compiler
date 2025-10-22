@@ -525,8 +525,29 @@ void codegen(Symbol *prog, FILE *out) {
                             emit("  .zero %d", elem_ty->size);
                         }
                     }
+                } else if (var->ty->kind == TY_INT) {
+                    /* Simple int initializer */
+                    if (var->init->is_expr && var->init->expr->kind == ND_NUM) {
+                        emit("  .long %d", var->init->expr->val);
+                    } else {
+                        emit("  .long 0");
+                    }
+                } else if (var->ty->kind == TY_CHAR) {
+                    /* Simple char initializer */
+                    if (var->init->is_expr && var->init->expr->kind == ND_NUM) {
+                        emit("  .byte %d", var->init->expr->val);
+                    } else {
+                        emit("  .byte 0");
+                    }
+                } else if (var->ty->kind == TY_PTR) {
+                    /* Pointer initializer */
+                    if (var->init->is_expr && var->init->expr->kind == ND_VAR) {
+                        emit("  .quad %s", var->init->expr->var->name);
+                    } else {
+                        emit("  .quad 0");
+                    }
                 } else {
-                    /* Simple initializer - for now, zero it */
+                    /* Other types - zero fill */
                     emit("  .zero %d", var->ty->size);
                 }
             } else {
