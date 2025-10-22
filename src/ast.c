@@ -98,6 +98,7 @@ void add_type(ASTNode *node) {
         case ND_XOR:
         case ND_SHL:
         case ND_SHR:
+        case ND_NOT:
             node->ty = node->lhs->ty;
             return;
         case ND_EQ:

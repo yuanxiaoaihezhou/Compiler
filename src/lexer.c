@@ -270,6 +270,7 @@ Token *tokenize(char *input, char *filename) {
             case '|': cur = cur->next = new_token(TK_OR, p, 1); p++; continue;
             case '^': cur = cur->next = new_token(TK_XOR, p, 1); p++; continue;
             case '!': cur = cur->next = new_token(TK_LNOT, p, 1); p++; continue;
+            case '~': cur = cur->next = new_token(TK_NOT, p, 1); p++; continue;
             case '(': cur = cur->next = new_token(TK_LPAREN, p, 1); p++; continue;
             case ')': cur = cur->next = new_token(TK_RPAREN, p, 1); p++; continue;
             case '{': cur = cur->next = new_token(TK_LBRACE, p, 1); p++; continue;
