@@ -331,7 +331,8 @@ IR *gen_ir(Symbol *prog) {
     nlabel = 1;
     
     for (Symbol *fn = prog; fn; fn = fn->next) {
-        if (fn->is_function) {
+        if (fn->is_function && fn->body) {
+            /* Only generate IR for functions with bodies (not declarations) */
             gen_function(fn);
         }
     }

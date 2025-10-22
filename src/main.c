@@ -8,6 +8,7 @@ static void usage(void) {
     fprintf(stderr, "  -o <file>  Write output to <file>\n");
     fprintf(stderr, "  -S         Generate assembly only\n");
     fprintf(stderr, "  -c         Compile only (do not link)\n");
+    fprintf(stderr, "  -I <dir>   Add directory to include search path\n");
     fprintf(stderr, "  -h         Display this help\n");
     exit(1);
 }
@@ -21,6 +22,8 @@ int main(int argc, char **argv) {
     char *output_file = NULL;
     bool asm_only = false;
     bool compile_only = false;
+    char *include_dirs[10] = {0};
+    int include_dir_count = 0;
     
     /* Parse command line arguments */
     for (int i = 1; i < argc; i++) {
@@ -33,6 +36,13 @@ int main(int argc, char **argv) {
             asm_only = true;
         } else if (strcmp(argv[i], "-c") == 0) {
             compile_only = true;
+        } else if (strcmp(argv[i], "-I") == 0) {
+            if (i + 1 >= argc) {
+                error("missing include directory");
+            }
+            if (include_dir_count < 10) {
+                include_dirs[include_dir_count++] = argv[++i];
+            }
         } else if (strcmp(argv[i], "-h") == 0) {
             usage();
         } else if (argv[i][0] == '-') {
@@ -49,6 +59,18 @@ int main(int argc, char **argv) {
     /* Initialize compiler state */
     compiler_state = calloc(1, sizeof(CompilerState));
     compiler_state->current_file = input_file;
+    compiler_state->include_paths = malloc(sizeof(char*) * (include_dir_count + 3));
+    compiler_state->include_count = 0;
+    
+    /* Add specified include directories */
+    for (int i = 0; i < include_dir_count; i++) {
+        compiler_state->include_paths[compiler_state->include_count++] = include_dirs[i];
+    }
+    
+    /* Add default include paths */
+    compiler_state->include_paths[compiler_state->include_count++] = ".";
+    compiler_state->include_paths[compiler_state->include_count++] = "/usr/include";
+    compiler_state->include_paths[compiler_state->include_count++] = "/usr/local/include";
     
     /* Preprocess */
     char *preprocessed = preprocess(input_file);

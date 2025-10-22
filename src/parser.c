@@ -1172,7 +1172,7 @@ static void parse_params(Token **rest, Token *tok, Symbol *fn) {
     *rest = tok->next;
 }
 
-/* Parse function definition */
+/* Parse function definition or declaration */
 static Symbol *function(Token **rest, Token *tok) {
     locals = NULL;
     
@@ -1188,6 +1188,15 @@ static Symbol *function(Token **rest, Token *tok) {
     
     parse_params(&tok, tok, fn);
     
+    /* Check if this is a declaration (prototype) or definition */
+    if (equal(tok, ";")) {
+        /* Function declaration - no body */
+        fn->body = NULL;
+        *rest = tok->next;
+        return fn;
+    }
+    
+    /* Function definition - has body */
     /* Add parameters to locals */
     for (Symbol *param = fn->params; param; param = param->next) {
         Symbol *local = calloc(1, sizeof(Symbol));

@@ -45,11 +45,19 @@ static void mark_included(const char *path) {
 /* Initialize include paths */
 static void init_include_paths(void) {
     if (include_paths) return;  /* Already initialized */
-    include_paths = calloc(10, sizeof(char*));
-    include_paths[0] = ".";
-    include_paths[1] = "/usr/include";
-    include_paths[2] = "/usr/local/include";
-    include_count = 3;
+    
+    /* Use include paths from compiler state if available */
+    if (compiler_state && compiler_state->include_paths) {
+        include_paths = compiler_state->include_paths;
+        include_count = compiler_state->include_count;
+    } else {
+        /* Fallback to default paths */
+        include_paths = calloc(10, sizeof(char*));
+        include_paths[0] = ".";
+        include_paths[1] = "/usr/include";
+        include_paths[2] = "/usr/local/include";
+        include_count = 3;
+    }
 }
 
 /* Find include file */
@@ -199,20 +207,31 @@ static void process_include(char *line, char *output, int *out_len) {
     /* Skip system headers - we don't need to parse them */
     if (is_system_header) {
         /* For certain headers, output necessary typedefs */
-        if (strcmp(filename, "stdbool.h") == 0 || strstr(filename, "stdbool.h")) {
-            const char *bool_defs = "\ntypedef int bool;\n#define true 1\n#define false 0\n";
+        if (strcmp(filename, "stdio.h") == 0 || strstr(filename, "stdio.h")) {
+            const char *stdio_defs = "\ntypedef int FILE;\n";
+            int len = strlen(stdio_defs);
+            memcpy(output + *out_len, stdio_defs, len);
+            *out_len += len;
+            output[*out_len] = '\0';
+        } else if (strcmp(filename, "stdbool.h") == 0 || strstr(filename, "stdbool.h")) {
+            const char *bool_defs = "\ntypedef int bool;\n";
             int len = strlen(bool_defs);
             memcpy(output + *out_len, bool_defs, len);
             *out_len += len;
             output[*out_len] = '\0';
+            /* Add defines for true and false */
+            add_define("true", "1");
+            add_define("false", "0");
         } else if (strcmp(filename, "stddef.h") == 0 || strstr(filename, "stddef.h")) {
-            const char *stddef_defs = "\ntypedef unsigned long size_t;\ntypedef long ptrdiff_t;\n#define NULL ((void*)0)\n";
+            const char *stddef_defs = "\ntypedef int size_t;\ntypedef int ptrdiff_t;\n";
             int len = strlen(stddef_defs);
             memcpy(output + *out_len, stddef_defs, len);
             *out_len += len;
             output[*out_len] = '\0';
+            /* Add define for NULL */
+            add_define("NULL", "((void*)0)");
         } else if (strcmp(filename, "stdint.h") == 0 || strstr(filename, "stdint.h")) {
-            const char *stdint_defs = "\ntypedef int int32_t;\ntypedef unsigned int uint32_t;\ntypedef long int64_t;\ntypedef unsigned long uint64_t;\n";
+            const char *stdint_defs = "\ntypedef int int32_t;\ntypedef int uint32_t;\ntypedef int int64_t;\ntypedef int uint64_t;\n";
             int len = strlen(stdint_defs);
             memcpy(output + *out_len, stdint_defs, len);
             *out_len += len;
@@ -368,8 +387,18 @@ static char *preprocess_recursive(char *input, int *out_len) {
                         skip_depth = -1;
                     }
                 }
+            } else if (strncmp(p, "undef", 5) == 0) {
+                /* Skip #undef */
+            } else if (strncmp(p, "pragma", 6) == 0) {
+                /* Skip #pragma */
+            } else if (strncmp(p, "error", 5) == 0) {
+                /* Skip #error */
+            } else if (strncmp(p, "warning", 7) == 0) {
+                /* Skip #warning */
+            } else if (strncmp(p, "line", 4) == 0) {
+                /* Skip #line */
             }
-            /* Skip all other preprocessor directives */
+            /* All preprocessor directives are now handled - they don't get copied to output */
         } else if (skip_depth < 0) {
             /* Expand macros and copy line to output if not skipping */
             int line_len = line_end - line;
