@@ -67,6 +67,8 @@
 - ✅ 指针类型
 - ✅ 数组
 - ⚠️ 结构体 (基本支持)
+- ✅ `enum` 枚举类型
+- ✅ `typedef` 类型别名
 
 ### 运算符
 - ✅ 算术: `+`, `-`, `*`, `/`, `%`
@@ -91,6 +93,8 @@
 - ✅ 参数传递 (最多6个寄存器参数)
 - ✅ 递归支持
 - ✅ 局部和全局变量
+- ✅ `static` 和 `extern` 存储类说明符 (解析支持)
+- ✅ `const` 类型限定符 (解析支持)
 
 ## 测试结果
 
@@ -180,7 +184,8 @@ make bootstrap-test      # 用自举编译器运行测试套件
 - ✅ 所有测试程序都能正确编译和运行
 - ✅ 提供了源代码合并工具用于多文件编译
 - ✅ Makefile提供了完整的多阶段自举选项（bootstrap、bootstrap-stage1、bootstrap-stage2、bootstrap-full、bootstrap-test）
-- ⚠️ 完全自举（编译自身）需要实现额外的C特性（typedef、enum等）
+- ✅ 已实现typedef、enum、static、extern、const等关键特性
+- ⚠️ 完全自举（编译自身）需要实现switch语句和可变参数函数
 
 详见 `docs/SELF_HOSTING.md` 了解完整自举所需的功能和各个自举阶段的说明。
 
@@ -195,10 +200,11 @@ make bootstrap-test      # 用自举编译器运行测试套件
 
 - ❌ 不支持浮点数
 - ❌ 预处理器功能有限 (仅#include)
-- ⚠️ typedef/enum 部分支持
+- ❌ 不支持switch/case语句
+- ❌ 不支持可变参数函数 (variadic functions)
+- ❌ 不支持goto语句
 - ❌ 不支持结构体初始化
 - ❌ 不支持函数指针
-- ❌ 不支持可变参数
 - ❌ 标准库支持有限
 
 ## 技术亮点

@@ -27,19 +27,24 @@ The compiler can successfully compile and run a variety of C programs, as demons
 
 The following features are used in the compiler source but not yet implemented:
 
-### Critical Features
-- [ ] `typedef` - type aliasing
-- [ ] `enum` - enumeration types
+### Critical Features (Completed)
+- [x] `typedef` - type aliasing ✓ IMPLEMENTED
+- [x] `enum` - enumeration types ✓ IMPLEMENTED
+- [x] `static` keyword ✓ IMPLEMENTED (parsing only)
+- [x] `extern` keyword ✓ IMPLEMENTED (parsing only)
+- [x] `const` keyword ✓ IMPLEMENTED (parsing only)
+
+### Critical Features (Still Needed)
+- [ ] `switch`/`case`/`default` statements - **CRITICAL for self-hosting**
+- [ ] Variadic functions (`...`, `va_list`, `va_start`, `va_end`) - **CRITICAL for error functions**
 - [ ] `struct` with member initialization
-- [ ] Global variable initialization
+- [ ] Global variable initialization with non-constant values
 - [ ] Array initialization with values
 - [ ] String concatenation
-- [ ] `static` keyword
-- [ ] `extern` keyword
-- [ ] `const` keyword
 - [ ] Cast expressions
 - [ ] Compound literals
 - [ ] Designated initializers
+- [ ] `goto` and labels
 
 ### Standard Library Functions
 - [ ] `calloc`, `malloc`, `free` - memory allocation

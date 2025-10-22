@@ -64,6 +64,8 @@ sudo make install
 - 指针类型
 - 数组
 - 结构体（基本支持）
+- 枚举类型（enum）
+- 类型别名（typedef）
 
 ### 运算符
 - 算术运算：`+`, `-`, `*`, `/`, `%`
@@ -93,6 +95,8 @@ sudo make install
 - `sizeof` 运算符
 - `#include` 预处理指令
 - 多文件编译支持
+- 存储类说明符（static, extern）
+- 类型限定符（const - 解析支持）
 
 ## 测试用例
 
@@ -137,7 +141,7 @@ make bootstrap-test
 3. 阶段2：使用mycc-stage1编译自己（mycc-stage2）
 4. 验证：确认mycc-stage1和mycc-stage2生成相同的输出
 
-**当前状态**：基础自举测试通过，完整自举需要实现额外的C特性（如typedef、enum等）。详见`docs/SELF_HOSTING.md`。
+**当前状态**：基础自举测试通过，已实现typedef/enum/static/extern/const等关键特性。完整自举需要实现switch语句和可变参数函数。详见`docs/SELF_HOSTING.md`。
 
 ## 技术文档
 
@@ -188,7 +192,12 @@ Compiler/
 - [x] 测试套件
 - [x] 技术文档
 - [x] 多阶段自举框架（Makefile提供完整的自举选项）
-- [ ] 完整的自举测试（需要实现typedef、enum等特性）
+- [x] typedef支持（类型别名）
+- [x] enum支持（枚举类型）
+- [x] static/extern/const关键字支持（解析）
+- [ ] switch/case语句（自举所需）
+- [ ] 可变参数函数（自举所需）
+- [ ] 完整的自举测试（需要实现switch和variadic functions）
 
 ## 已知限制
 
@@ -198,7 +207,9 @@ Compiler/
 - 结构体支持有限
 - 不支持联合体
 - 不支持函数指针
-- 不支持可变参数函数
+- 不支持可变参数函数（variadic functions）
+- 不支持switch/case语句
+- 不支持goto语句
 - 标准库支持有限
 
 ## 贡献
