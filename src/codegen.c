@@ -85,21 +85,45 @@ static void gen_expr_asm(ASTNode *node) {
             return;
         case ND_VAR:
             gen_addr(node);
-            emit("  mov rax, [rax]");
+            /* Arrays decay to pointers - don't dereference */
+            if (node->var->ty->kind != TY_ARRAY) {
+                /* Load with correct size based on type */
+                if (node->var->ty->size == 1) {
+                    emit("  movsx rax, byte ptr [rax]");
+                } else if (node->var->ty->size == 4) {
+                    emit("  movsxd rax, dword ptr [rax]");
+                } else {
+                    emit("  mov rax, [rax]");
+                }
+            }
             return;
         case ND_ADDR:
             gen_addr(node->lhs);
             return;
         case ND_DEREF:
             gen_expr_asm(node->lhs);
-            emit("  mov rax, [rax]");
+            /* Load with correct size based on type */
+            if (node->ty && node->ty->size == 1) {
+                emit("  movsx rax, byte ptr [rax]");
+            } else if (node->ty && node->ty->size == 4) {
+                emit("  movsxd rax, dword ptr [rax]");
+            } else {
+                emit("  mov rax, [rax]");
+            }
             return;
         case ND_ASSIGN:
             gen_addr(node->lhs);
             push("rax");
             gen_expr_asm(node->rhs);
             pop("rdi");
-            emit("  mov [rdi], rax");
+            /* Store with correct size based on type */
+            if (node->lhs->ty->size == 1) {
+                emit("  mov [rdi], al");
+            } else if (node->lhs->ty->size == 4) {
+                emit("  mov [rdi], eax");
+            } else {
+                emit("  mov [rdi], rax");
+            }
             return;
         case ND_CALL: {
             /* Save caller-saved registers */
@@ -158,6 +182,13 @@ static void gen_expr_asm(ASTNode *node) {
     
     switch (node->kind) {
         case ND_ADD:
+            /* Handle pointer arithmetic - scale the right operand if left is a pointer */
+            if (node->lhs->ty && (node->lhs->ty->kind == TY_PTR || node->lhs->ty->kind == TY_ARRAY)) {
+                int size = node->lhs->ty->base ? node->lhs->ty->base->size : 1;
+                if (size > 1) {
+                    emit("  imul rdi, %d", size);
+                }
+            }
             emit("  add rax, rdi");
             return;
         case ND_SUB:

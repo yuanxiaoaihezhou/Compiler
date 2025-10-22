@@ -109,6 +109,14 @@ static int gen_expr(ASTNode *node) {
             return gen_binop(IR_SHL, node);
         case ND_SHR:
             return gen_binop(IR_SHR, node);
+        case ND_LAND:
+        case ND_LOR:
+        case ND_LNOT:
+            /* For now, treat logical operators as expressions that will be handled in codegen */
+            /* This is a simplified approach - just evaluate both sides */
+            if (node->lhs) gen_expr(node->lhs);
+            if (node->rhs) gen_expr(node->rhs);
+            return new_reg();
         case ND_ASSIGN: {
             int rhs = gen_expr(node->rhs);
             int lhs = gen_expr(node->lhs);
