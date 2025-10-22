@@ -85,6 +85,7 @@ struct Type {
     Type *return_ty;   /* Function return type */
     Type *params;      /* Function parameters */
     Type *next;        /* Next parameter */
+    Symbol *enum_list; /* For TY_ENUM - list of enum constants */
 };
 
 /* Struct member */
@@ -140,6 +141,10 @@ struct Symbol {
     Symbol *params;    /* Function parameters */
     Symbol *locals;    /* Local variables */
     int stack_size;    /* Stack size for function */
+    bool is_typedef;   /* Is this a typedef? */
+    bool is_static;    /* Static storage class */
+    bool is_extern;    /* External linkage */
+    int enum_val;      /* For enum constants */
 };
 
 /* Intermediate representation */

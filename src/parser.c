@@ -3,6 +3,8 @@
 static Symbol *locals;
 static Symbol *globals;
 static Symbol *current_fn;
+static Symbol *typedefs;  /* Typedef symbols */
+static Symbol *enums;     /* Enum constants */
 
 /* Type definitions */
 static Type *ty_void;
@@ -27,9 +29,18 @@ static ASTNode *postfix(Token **rest, Token *tok);
 static ASTNode *primary(Token **rest, Token *tok);
 static ASTNode *stmt(Token **rest, Token *tok);
 static ASTNode *compound_stmt(Token **rest, Token *tok);
-static Type *declspec(Token **rest, Token *tok);
-static Type *declarator(Token **rest, Token *tok, Type *ty);
 static Symbol *find_var(Token *tok);
+
+/* Declaration specifiers */
+typedef struct {
+    Type *ty;
+    bool is_typedef;
+    bool is_static;
+    bool is_extern;
+} DeclSpec;
+
+static DeclSpec *declspec(Token **rest, Token *tok);
+static Type *declarator(Token **rest, Token *tok, Type *ty);
 
 /* Find variable by name */
 static Symbol *find_var(Token *tok) {
@@ -43,6 +54,28 @@ static Symbol *find_var(Token *tok) {
         if (strlen(var->name) == tok->len && 
             strncmp(var->name, tok->str, tok->len) == 0) {
             return var;
+        }
+    }
+    return NULL;
+}
+
+/* Find typedef by name */
+static Symbol *find_typedef(Token *tok) {
+    for (Symbol *td = typedefs; td; td = td->next) {
+        if (strlen(td->name) == tok->len &&
+            strncmp(td->name, tok->str, tok->len) == 0) {
+            return td;
+        }
+    }
+    return NULL;
+}
+
+/* Find enum constant by name */
+static Symbol *find_enum(Token *tok) {
+    for (Symbol *e = enums; e; e = e->next) {
+        if (strlen(e->name) == tok->len &&
+            strncmp(e->name, tok->str, tok->len) == 0) {
+            return e;
         }
     }
     return NULL;
@@ -128,6 +161,12 @@ static ASTNode *primary(Token **rest, Token *tok) {
         /* Variable reference */
         Symbol *var = find_var(tok);
         if (!var) {
+            /* Check if it's an enum constant */
+            Symbol *enum_const = find_enum(tok);
+            if (enum_const) {
+                *rest = tok->next;
+                return new_num(enum_const->enum_val);
+            }
             error_tok(tok, "undefined variable");
         }
         *rest = tok->next;
@@ -470,14 +509,46 @@ static ASTNode *compound_stmt(Token **rest, Token *tok) {
     ASTNode *cur = &head;
     
     while (!equal(tok, "}")) {
+        /* Check if this is a declaration */
+        bool is_decl = false;
+        if (tok->kind == TK_INT || tok->kind == TK_CHAR || tok->kind == TK_VOID ||
+            tok->kind == TK_TYPEDEF || tok->kind == TK_STATIC || tok->kind == TK_EXTERN ||
+            tok->kind == TK_CONST || tok->kind == TK_ENUM || tok->kind == TK_STRUCT) {
+            is_decl = true;
+        } else if (tok->kind == TK_IDENT && find_typedef(tok)) {
+            /* Typedef name */
+            is_decl = true;
+        }
+        
         /* Declaration */
-        if (tok->kind == TK_INT || tok->kind == TK_CHAR || tok->kind == TK_VOID) {
-            Type *basety = declspec(&tok, tok);
+        if (is_decl) {
+            DeclSpec *spec = declspec(&tok, tok);
+            
+            /* Handle typedef in local scope (unusual but legal) */
+            if (spec->is_typedef) {
+                Type *ty = declarator(&tok, tok, spec->ty);
+                
+                if (tok->kind != TK_IDENT) {
+                    error_tok(tok, "expected typedef name");
+                }
+                Symbol *td = calloc(1, sizeof(Symbol));
+                td->name = strndup_custom(tok->str, tok->len);
+                td->ty = ty;
+                td->is_typedef = true;
+                td->next = typedefs;
+                typedefs = td;
+                tok = skip(tok->next, ";");
+                continue;
+            }
+            
+            Type *basety = spec->ty;
+            bool first_var = true;
             
             while (!equal(tok, ";")) {
-                if (cur != &head) {
+                if (!first_var) {
                     tok = skip(tok, ",");
                 }
+                first_var = false;
                 
                 Type *ty = declarator(&tok, tok, basety);
                 
@@ -501,6 +572,8 @@ static ASTNode *compound_stmt(Token **rest, Token *tok) {
                 }
                 
                 Symbol *var = new_lvar(name, ty);
+                var->is_static = spec->is_static;
+                var->is_extern = spec->is_extern;
                 
                 if (equal(tok, "=")) {
                     ASTNode *lhs = new_node(ND_VAR);
@@ -525,19 +598,139 @@ static ASTNode *compound_stmt(Token **rest, Token *tok) {
 }
 
 /* Parse type specifier */
-static Type *declspec(Token **rest, Token *tok) {
+/* Parse declaration specifiers (type + storage class) */
+static DeclSpec *declspec(Token **rest, Token *tok) {
+    DeclSpec *spec = calloc(1, sizeof(DeclSpec));
+    
+    /* Parse storage class specifiers and type qualifiers */
+    while (true) {
+        if (tok->kind == TK_TYPEDEF) {
+            spec->is_typedef = true;
+            tok = tok->next;
+            continue;
+        }
+        if (tok->kind == TK_STATIC) {
+            spec->is_static = true;
+            tok = tok->next;
+            continue;
+        }
+        if (tok->kind == TK_EXTERN) {
+            spec->is_extern = true;
+            tok = tok->next;
+            continue;
+        }
+        if (tok->kind == TK_CONST) {
+            /* Ignore const for now */
+            tok = tok->next;
+            continue;
+        }
+        break;
+    }
+    
+    /* Parse type specifier */
     if (tok->kind == TK_VOID) {
+        spec->ty = ty_void;
         *rest = tok->next;
-        return ty_void;
+        return spec;
     }
     if (tok->kind == TK_CHAR) {
+        spec->ty = ty_char;
         *rest = tok->next;
-        return ty_char;
+        return spec;
     }
     if (tok->kind == TK_INT) {
+        spec->ty = ty_int;
         *rest = tok->next;
-        return ty_int;
+        return spec;
     }
+    
+    /* Enum type */
+    if (tok->kind == TK_ENUM) {
+        tok = tok->next;
+        
+        /* Skip optional enum tag */
+        if (tok->kind == TK_IDENT) {
+            tok = tok->next;
+        }
+        
+        /* Parse enum body */
+        if (equal(tok, "{")) {
+            tok = tok->next;
+            int val = 0;
+            
+            while (!equal(tok, "}")) {
+                if (tok->kind != TK_IDENT) {
+                    error_tok(tok, "expected enum constant name");
+                }
+                
+                /* Create enum constant */
+                Symbol *e = calloc(1, sizeof(Symbol));
+                e->name = strndup_custom(tok->str, tok->len);
+                e->enum_val = val;
+                e->next = enums;
+                enums = e;
+                
+                tok = tok->next;
+                
+                /* Check for explicit value */
+                if (equal(tok, "=")) {
+                    tok = tok->next;
+                    if (tok->kind != TK_NUM) {
+                        error_tok(tok, "expected number in enum");
+                    }
+                    val = tok->val;
+                    tok = tok->next;
+                }
+                
+                val++;
+                
+                if (equal(tok, ",")) {
+                    tok = tok->next;
+                }
+            }
+            tok = skip(tok, "}");
+        }
+        
+        spec->ty = ty_int;  /* Enums are treated as int */
+        *rest = tok;
+        return spec;
+    }
+    
+    /* Struct type */
+    if (tok->kind == TK_STRUCT) {
+        tok = tok->next;
+        
+        /* For now, just skip struct definitions */
+        if (tok->kind == TK_IDENT) {
+            tok = tok->next;
+        }
+        
+        if (equal(tok, "{")) {
+            int depth = 1;
+            tok = tok->next;
+            while (depth > 0) {
+                if (equal(tok, "{")) depth++;
+                else if (equal(tok, "}")) depth--;
+                tok = tok->next;
+            }
+        }
+        
+        /* Treat struct as int for now (simplified) */
+        spec->ty = ty_int;
+        *rest = tok;
+        return spec;
+    }
+    
+    /* Check for typedef name */
+    if (tok->kind == TK_IDENT) {
+        Symbol *td = find_typedef(tok);
+        if (td) {
+            spec->ty = td->ty;
+            *rest = tok->next;
+            return spec;
+        }
+    }
+    
     error_tok(tok, "expected type specifier");
     return NULL;
 }
@@ -571,8 +764,8 @@ static void parse_params(Token **rest, Token *tok, Symbol *fn) {
             tok = skip(tok, ",");
         }
         
-        Type *basety = declspec(&tok, tok);
-        Type *ty = declarator(&tok, tok, basety);
+        DeclSpec *spec = declspec(&tok, tok);
+        Type *ty = declarator(&tok, tok, spec->ty);
         
         if (tok->kind != TK_IDENT) {
             error_tok(tok, "expected parameter name");
@@ -595,12 +788,14 @@ static void parse_params(Token **rest, Token *tok, Symbol *fn) {
 static Symbol *function(Token **rest, Token *tok) {
     locals = NULL;
     
-    Type *ty = declspec(&tok, tok);
-    ty = declarator(&tok, tok, ty);
+    DeclSpec *spec = declspec(&tok, tok);
+    Type *ty = declarator(&tok, tok, spec->ty);
     
     Symbol *fn = calloc(1, sizeof(Symbol));
     fn->name = strndup_custom(tok->str, tok->len);
     fn->is_function = true;
+    fn->is_static = spec->is_static;
+    fn->is_extern = spec->is_extern;
     tok = tok->next;
     
     parse_params(&tok, tok, fn);
@@ -625,8 +820,49 @@ static Symbol *function(Token **rest, Token *tok) {
 
 /* Parse global declaration or function */
 static bool is_function(Token *tok) {
+    /* Skip storage class specifiers and type qualifiers */
+    while (tok->kind == TK_TYPEDEF || tok->kind == TK_STATIC || 
+           tok->kind == TK_EXTERN || tok->kind == TK_CONST) {
+        tok = tok->next;
+    }
+    
     /* Skip type specifier */
     if (tok->kind == TK_INT || tok->kind == TK_CHAR || tok->kind == TK_VOID) {
+        tok = tok->next;
+    } else if (tok->kind == TK_ENUM) {
+        tok = tok->next;
+        /* Skip enum tag */
+        if (tok->kind == TK_IDENT) {
+            tok = tok->next;
+        }
+        /* Skip enum body if present */
+        if (equal(tok, "{")) {
+            int depth = 1;
+            tok = tok->next;
+            while (depth > 0 && tok->kind != TK_EOF) {
+                if (equal(tok, "{")) depth++;
+                else if (equal(tok, "}")) depth--;
+                tok = tok->next;
+            }
+        }
+    } else if (tok->kind == TK_STRUCT) {
+        tok = tok->next;
+        /* Skip struct tag */
+        if (tok->kind == TK_IDENT) {
+            tok = tok->next;
+        }
+        /* Skip struct body if present */
+        if (equal(tok, "{")) {
+            int depth = 1;
+            tok = tok->next;
+            while (depth > 0 && tok->kind != TK_EOF) {
+                if (equal(tok, "{")) depth++;
+                else if (equal(tok, "}")) depth--;
+                tok = tok->next;
+            }
+        }
+    } else if (tok->kind == TK_IDENT) {
+        /* Could be typedef name */
         tok = tok->next;
     }
     
@@ -654,21 +890,43 @@ Symbol *parse(Token *tok) {
         if (is_function(tok)) {
             cur = cur->next = function(&tok, tok);
         } else {
-            /* Global variable declaration */
-            Type *basety = declspec(&tok, tok);
+            /* Global variable or typedef declaration */
+            DeclSpec *spec = declspec(&tok, tok);
             
+            /* Handle typedef */
+            if (spec->is_typedef) {
+                Type *ty = declarator(&tok, tok, spec->ty);
+                
+                if (tok->kind != TK_IDENT) {
+                    error_tok(tok, "expected typedef name");
+                }
+                
+                Symbol *td = calloc(1, sizeof(Symbol));
+                td->name = strndup_custom(tok->str, tok->len);
+                td->ty = ty;
+                td->is_typedef = true;
+                td->next = typedefs;
+                typedefs = td;
+                
+                tok = skip(tok->next, ";");
+                continue;
+            }
+            
+            /* Global variable declaration */
             while (!equal(tok, ";")) {
                 if (cur != &head) {
                     tok = skip(tok, ",");
                 }
                 
-                Type *ty = declarator(&tok, tok, basety);
+                Type *ty = declarator(&tok, tok, spec->ty);
                 
                 if (tok->kind != TK_IDENT) {
                     error_tok(tok, "expected variable name");
                 }
                 
                 Symbol *var = new_gvar(strndup_custom(tok->str, tok->len), ty);
+                var->is_static = spec->is_static;
+                var->is_extern = spec->is_extern;
                 tok = tok->next;
                 
                 if (equal(tok, "=")) {
