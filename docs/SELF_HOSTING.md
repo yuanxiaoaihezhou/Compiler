@@ -89,19 +89,74 @@ To achieve full self-hosting, implement features in this order:
 
 ## Current Bootstrap Test
 
-The `make bootstrap` target demonstrates multi-stage compilation:
+The Makefile now provides comprehensive bootstrap testing options:
 
+### Basic Bootstrap (make bootstrap)
+Tests that the compiler can compile simple programs:
 ```bash
 make bootstrap
 ```
 
 This:
-1. Compiles the compiler with GCC (stage 0 → stage 1)
-2. Compiles combined source with stage 1 (stage 1 → stage 2)
-3. Compiles combined source with stage 2 (stage 2 → stage 3)
-4. Verifies stages 2 and 3 are identical
+1. Compiles the compiler with GCC (stage 0)
+2. Creates a combined source file
+3. Tests the stage 0 compiler with basic test programs
+4. Verifies correct execution
 
-Currently, step 2 will fail due to missing features, but this framework is ready for when all features are implemented.
+### Stage 1 Bootstrap (make bootstrap-stage1)
+Attempts to compile the compiler with itself:
+```bash
+make bootstrap-stage1
+```
+
+This:
+1. Compiles the compiler with GCC (stage 0 → mycc-stage0)
+2. Creates combined source file (mycc_combined.c)
+3. Attempts to compile mycc_combined.c with mycc-stage0 → mycc-stage1
+4. Tests the stage 1 compiler if compilation succeeds
+
+**Current Status**: Fails due to missing language features (expected)
+
+### Stage 2 Bootstrap (make bootstrap-stage2)
+Compiles the compiler with the stage 1 compiler:
+```bash
+make bootstrap-stage2
+```
+
+This:
+1. Runs bootstrap-stage1
+2. Compiles mycc_combined.c with mycc-stage1 → mycc-stage2
+3. Tests the stage 2 compiler if compilation succeeds
+
+**Current Status**: Requires stage 1 to succeed first
+
+### Full Bootstrap (make bootstrap-full)
+Complete 3-stage bootstrap with verification:
+```bash
+make bootstrap-full
+```
+
+This:
+1. Runs bootstrap-stage2
+2. Compares mycc-stage1 and mycc-stage2 binaries
+3. If binaries differ, tests functional equivalence on all test programs
+4. Verifies that both compilers produce identical outputs
+
+**Current Status**: Requires stage 1 to succeed first
+
+### Bootstrap Test (make bootstrap-test)
+Runs all test programs with the bootstrapped compiler:
+```bash
+make bootstrap-test
+```
+
+This:
+1. Runs bootstrap-stage1
+2. Compiles all test programs with mycc-stage1
+3. Compares outputs with GCC-compiled versions
+4. Reports pass/fail for each test
+
+**Current Status**: Requires stage 1 to succeed first
 
 ## Test Results
 
