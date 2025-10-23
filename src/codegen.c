@@ -589,8 +589,8 @@ void codegen(Symbol *prog, FILE *out) {
     emit(".data");
     for (Symbol *var = prog; var; var = var->next) {
         if (!var->is_function && !var->is_local && !var->is_extern) {
-            /* Only emit .globl for non-string-literal globals */
-            if (var->name[0] != '.' || var->name[1] != 'L' || var->name[2] != 'C') {
+            /* Only emit .globl for non-static, non-string-literal globals */
+            if (!var->is_static && (var->name[0] != '.' || var->name[1] != 'L' || var->name[2] != 'C')) {
                 emit(".globl %s", var->name);
             }
             emit("%s:", var->name);

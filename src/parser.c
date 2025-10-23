@@ -51,6 +51,25 @@ typedef struct {
 static DeclSpec *declspec(Token **rest, Token *tok);
 static Type *declarator(Token **rest, Token *tok, Type *ty);
 
+/* Calculate alignment for a type */
+static int get_alignment(Type *ty) {
+    if (!ty) return 1;
+    switch (ty->kind) {
+        case TY_VOID: return 1;
+        case TY_CHAR: return 1;
+        case TY_INT: return 4;
+        case TY_PTR: return 8;
+        case TY_ARRAY: return get_alignment(ty->base);
+        case TY_STRUCT: return ty->align;
+        default: return 1;
+    }
+}
+
+/* Align offset to alignment boundary */
+static int align_to(int offset, int align) {
+    return (offset + align - 1) / align * align;
+}
+
 /* Find variable by name */
 static Symbol *find_var(Token *tok) {
     for (Symbol *var = locals; var; var = var->next) {
@@ -1200,6 +1219,7 @@ static DeclSpec *declspec(Token **rest, Token *tok) {
             Member head = {0};
             Member *cur_mem = &head;
             int offset = 0;
+            int max_align = 1;
             
             /* Parse struct members */
             while (!equal(tok, "}")) {
@@ -1220,12 +1240,21 @@ static DeclSpec *declspec(Token **rest, Token *tok) {
                         error_tok(tok, "expected member name");
                     }
                     
+                    /* Calculate alignment for this member */
+                    int align = get_alignment(mem_ty);
+                    if (align > max_align) {
+                        max_align = align;
+                    }
+                    
+                    /* Align offset to member's alignment */
+                    offset = align_to(offset, align);
+                    
                     Member *mem = calloc(1, sizeof(Member));
                     mem->ty = mem_ty;
                     mem->name = strndup_custom(tok->str, tok->len);
                     mem->offset = offset;
                     
-                    /* Update offset and size */
+                    /* Update offset for next member */
                     offset += mem_ty->size;
                     
                     cur_mem = cur_mem->next = mem;
@@ -1235,8 +1264,12 @@ static DeclSpec *declspec(Token **rest, Token *tok) {
             }
             tok = skip(tok, "}");
             
+            /* Align the whole struct to its maximum member alignment */
+            offset = align_to(offset, max_align);
+            
             struct_ty->members = head.next;
             struct_ty->size = offset;
+            struct_ty->align = max_align;
             
             spec->ty = struct_ty;
             *rest = tok;
