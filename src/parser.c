@@ -244,27 +244,32 @@ static ASTNode *postfix(Token **rest, Token *tok) {
         
         /* Member access */
         if (equal(tok, ".")) {
-            node = new_node(ND_MEMBER);
-            node->lhs = node;
+            ASTNode *member_node = new_node(ND_MEMBER);
+            member_node->lhs = node;
             tok = tok->next;
             if (tok->kind != TK_IDENT) {
                 error_tok(tok, "expected member name");
             }
-            /* Member resolution will be done in type checking */
+            /* Store member name temporarily in funcname field */
+            member_node->funcname = strndup_custom(tok->str, tok->len);
             tok = tok->next;
+            node = member_node;
             continue;
         }
         
         /* Pointer member access */
         if (equal(tok, "->")) {
             ASTNode *deref = new_binary(ND_DEREF, node, NULL);
-            node = new_node(ND_MEMBER);
-            node->lhs = deref;
+            ASTNode *member_node = new_node(ND_MEMBER);
+            member_node->lhs = deref;
             tok = tok->next;
             if (tok->kind != TK_IDENT) {
                 error_tok(tok, "expected member name");
             }
+            /* Store member name temporarily in funcname field */
+            member_node->funcname = strndup_custom(tok->str, tok->len);
             tok = tok->next;
+            node = member_node;
             continue;
         }
         
@@ -531,6 +536,16 @@ static ASTNode *assign(Token **rest, Token *tok) {
     
     if (equal(tok, "=")) {
         node = new_binary(ND_ASSIGN, node, assign(&tok, tok->next));
+    } else if (tok->kind == TK_PLUS_ASSIGN) {
+        /* a += b becomes a = a + b */
+        ASTNode *rhs = assign(&tok, tok->next);
+        ASTNode *add = new_binary(ND_ADD, copy_node(node), rhs);
+        node = new_binary(ND_ASSIGN, node, add);
+    } else if (tok->kind == TK_MINUS_ASSIGN) {
+        /* a -= b becomes a = a - b */
+        ASTNode *rhs = assign(&tok, tok->next);
+        ASTNode *sub = new_binary(ND_SUB, copy_node(node), rhs);
+        node = new_binary(ND_ASSIGN, node, sub);
     }
     
     *rest = tok;

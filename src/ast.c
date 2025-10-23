@@ -148,9 +148,47 @@ void add_type(ASTNode *node) {
                 node->ty = new_type(TY_INT, 4, 4);
             }
             return;
-        case ND_MEMBER:
-            node->ty = node->member->ty;
+        case ND_MEMBER: {
+            /* Resolve member name to Member* */
+            if (!node->member && node->funcname) {
+                /* Get the struct type from lhs */
+                Type *struct_ty = node->lhs->ty;
+                if (!struct_ty) {
+                    /* Type not yet determined - will retry later */
+                    return;
+                }
+                
+                /* For pointer types, get the base type */
+                if (struct_ty->kind == TY_PTR) {
+                    struct_ty = struct_ty->base;
+                }
+                
+                if (struct_ty->kind != TY_STRUCT) {
+                    /* Not a struct - error will be caught elsewhere */
+                    node->ty = new_type(TY_INT, 4, 4); /* fallback */
+                    return;
+                }
+                
+                /* Look up member by name */
+                for (Member *mem = struct_ty->members; mem; mem = mem->next) {
+                    if (strcmp(mem->name, node->funcname) == 0) {
+                        node->member = mem;
+                        break;
+                    }
+                }
+                
+                if (!node->member) {
+                    /* Member not found - error will be caught elsewhere */
+                    node->ty = new_type(TY_INT, 4, 4); /* fallback */
+                    return;
+                }
+            }
+            
+            if (node->member) {
+                node->ty = node->member->ty;
+            }
             return;
+        }
         case ND_SIZEOF:
             node->ty = new_type(TY_INT, 4, 4);
             return;

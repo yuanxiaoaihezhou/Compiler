@@ -21,7 +21,11 @@ static IR *constant_fold(IR *ir) {
         new_tail->next = NULL;
     }
     
-    return new_head ? new_head : ir;
+    if (new_head) {
+        return new_head;
+    } else {
+        return ir;
+    }
 }
 
 /* Dead code elimination */
@@ -54,7 +58,11 @@ static IR *eliminate_dead_code(IR *ir) {
         }
     }
     
-    return new_head ? new_head : ir;
+    if (new_head) {
+        return new_head;
+    } else {
+        return ir;
+    }
 }
 
 /* Main optimization function */

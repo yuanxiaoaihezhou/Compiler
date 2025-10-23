@@ -3,6 +3,7 @@
 static FILE *output;
 static int stack_depth;
 static Symbol *current_function;
+static int label_count = 0;
 
 /* Forward declaration */
 static void gen_expr_asm(ASTNode *node);
@@ -54,10 +55,12 @@ static void assign_lvar_offsets(Symbol *fn) {
     int offset = 0;
     for (Symbol *var = fn->locals; var; var = var->next) {
         offset += var->ty->size;
-        offset = (offset + 7) & ~7; /* Align to 8 bytes */
+        /* Align to 8 bytes: round up to next multiple of 8 */
+        offset = ((offset + 7) / 8) * 8;
         var->offset = offset;
     }
-    fn->stack_size = (offset + 15) & ~15; /* Align to 16 bytes */
+    /* Align to 16 bytes: round up to next multiple of 16 */
+    fn->stack_size = ((offset + 15) / 16) * 16;
 }
 
 /* Load variable address */
@@ -73,6 +76,17 @@ static void gen_addr(ASTNode *node) {
     
     if (node->kind == ND_DEREF) {
         gen_expr_asm(node->lhs);
+        return;
+    }
+    
+    if (node->kind == ND_MEMBER) {
+        /* Generate address of struct member */
+        /* First get address of the struct itself */
+        gen_addr(node->lhs);
+        /* Then add the member offset */
+        if (node->member && node->member->offset > 0) {
+            emit("  add rax, %d", node->member->offset);
+        }
         return;
     }
     
@@ -109,6 +123,22 @@ static void gen_expr_asm(ASTNode *node) {
                 emit("  movsx rax, byte ptr [rax]");
             } else if (node->ty && node->ty->size == 4) {
                 emit("  movsxd rax, dword ptr [rax]");
+            } else {
+                emit("  mov rax, [rax]");
+            }
+            return;
+        case ND_MEMBER:
+            /* Generate address and load value */
+            gen_addr(node);
+            /* Load with correct size based on member type */
+            if (node->member && node->member->ty) {
+                if (node->member->ty->size == 1) {
+                    emit("  movsx rax, byte ptr [rax]");
+                } else if (node->member->ty->size == 4) {
+                    emit("  movsxd rax, dword ptr [rax]");
+                } else {
+                    emit("  mov rax, [rax]");
+                }
             } else {
                 emit("  mov rax, [rax]");
             }
@@ -171,7 +201,13 @@ static void gen_expr_asm(ASTNode *node) {
                 push("rax");
             }
             
-            for (i = nargs < 6 ? nargs - 1 : 5; i >= 0; i--) {
+            int end_i;
+            if (nargs < 6) {
+                end_i = nargs - 1;
+            } else {
+                end_i = 5;
+            }
+            for (i = end_i; i >= 0; i--) {
                 pop(argregs[i]);
             }
             
@@ -209,7 +245,10 @@ static void gen_expr_asm(ASTNode *node) {
         case ND_ADD:
             /* Handle pointer arithmetic - scale the right operand if left is a pointer */
             if (node->lhs->ty && (node->lhs->ty->kind == TY_PTR || node->lhs->ty->kind == TY_ARRAY)) {
-                int size = node->lhs->ty->base ? node->lhs->ty->base->size : 1;
+                int size = 1;
+                if (node->lhs->ty->base) {
+                    size = node->lhs->ty->base->size;
+                }
                 if (size > 1) {
                     emit("  imul rdi, %d", size);
                 }
@@ -291,12 +330,23 @@ static void gen_expr_asm(ASTNode *node) {
             emit("  mov rcx, rdi");
             emit("  shr rax, cl");
             return;
+        case ND_COND: {
+            /* Conditional expression: cond ? then : els */
+            int c = label_count++;
+            gen_expr_asm(node->cond);
+            emit("  cmp rax, 0");
+            emit("  je .L.else.%d", c);
+            gen_expr_asm(node->then);
+            emit("  jmp .L.end.%d", c);
+            emit(".L.else.%d:", c);
+            gen_expr_asm(node->els);
+            emit(".L.end.%d:", c);
+            return;
+        }
     }
     
     error("invalid expression");
 }
-
-static int label_count = 0;
 
 /* Generate assembly for statement */
 static void gen_stmt_asm(ASTNode *node) {
