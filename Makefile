@@ -13,6 +13,7 @@ DOC_DIR = docs
 
 # Compiler source files
 SRCS = $(SRC_DIR)/main.c \
+       $(SRC_DIR)/pipeline.c \
        $(SRC_DIR)/lexer.c \
        $(SRC_DIR)/parser.c \
        $(SRC_DIR)/ast.c \

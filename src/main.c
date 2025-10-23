@@ -1,5 +1,5 @@
 #include "compiler.h"
-#include <unistd.h>
+#include "pipeline.h"
 
 /* Print usage */
 static void usage(void) {
@@ -17,6 +17,9 @@ int main(int argc, char **argv) {
     if (argc < 2) {
         usage();
     }
+    
+    /* Create pipeline context */
+    PipelineContext *ctx = create_pipeline_context();
     
     char *input_file = NULL;
     char *output_file = NULL;
@@ -56,47 +59,24 @@ int main(int argc, char **argv) {
         error("no input file");
     }
     
-    /* Initialize compiler state */
-    compiler_state = calloc(1, sizeof(CompilerState));
-    compiler_state->current_file = input_file;
-    compiler_state->include_paths = malloc(sizeof(char*) * (include_dir_count + 3));
-    compiler_state->include_count = 0;
+    /* Setup pipeline context */
+    ctx->input_file = input_file;
+    ctx->asm_only = asm_only;
+    ctx->compile_only = compile_only;
+    
+    /* Setup include paths */
+    ctx->include_paths = malloc(sizeof(char*) * (include_dir_count + 3));
+    ctx->include_count = 0;
     
     /* Add specified include directories */
     for (int i = 0; i < include_dir_count; i++) {
-        compiler_state->include_paths[compiler_state->include_count] = include_dirs[i];
-        compiler_state->include_count++;
+        ctx->include_paths[ctx->include_count++] = include_dirs[i];
     }
     
     /* Add default include paths */
-    compiler_state->include_paths[compiler_state->include_count] = ".";
-    compiler_state->include_count++;
-    compiler_state->include_paths[compiler_state->include_count] = "/usr/include";
-    compiler_state->include_count++;
-    compiler_state->include_paths[compiler_state->include_count] = "/usr/local/include";
-    compiler_state->include_count++;
-    
-    /* Preprocess */
-    char *preprocessed = preprocess(input_file);
-    
-    /* Tokenize */
-    Token *tok = tokenize(preprocessed, input_file);
-    
-    /* Parse */
-    Symbol *prog = parse(tok);
-    
-    /* Add type information */
-    for (Symbol *fn = prog; fn; fn = fn->next) {
-        if (fn->is_function && fn->body) {
-            add_type(fn->body);
-        }
-    }
-    
-    /* Generate IR */
-    IR *ir = gen_ir(prog);
-    
-    /* Optimize */
-    ir = optimize(ir);
+    ctx->include_paths[ctx->include_count++] = ".";
+    ctx->include_paths[ctx->include_count++] = "/usr/include";
+    ctx->include_paths[ctx->include_count++] = "/usr/local/include";
     
     /* Determine output file name */
     if (!output_file) {
@@ -114,41 +94,23 @@ int main(int argc, char **argv) {
             output_file = "a.out";
         }
     }
+    ctx->output_file = output_file;
     
-    /* Generate assembly */
-    char *asm_file;
-    if (asm_only) {
-        asm_file = output_file;
-    } else {
-        asm_file = "/tmp/mycc_tmp.s";
-    }
+    /* Run the compiler pipeline
+     * This executes all compilation stages in strict order:
+     * 1. Preprocessing
+     * 2. Lexical Analysis
+     * 3. Syntax Analysis
+     * 4. Semantic Analysis
+     * 5. IR Generation
+     * 6. Optimization
+     * 7. Code Generation
+     * 8. Assembly and Linking
+     */
+    int result = run_compiler_pipeline(ctx);
     
-    FILE *out = fopen(asm_file, "w");
-    if (!out) {
-        error("cannot open output file: %s", asm_file);
-    }
+    /* Cleanup */
+    free_pipeline_context(ctx);
     
-    codegen(prog, out);
-    fclose(out);
-    
-    /* Assemble and link if needed */
-    if (!asm_only) {
-        char cmd[1024];
-        if (compile_only) {
-            snprintf(cmd, sizeof(cmd), "gcc -c %s -o %s", asm_file, output_file);
-        } else {
-            snprintf(cmd, sizeof(cmd), "gcc %s -o %s", asm_file, output_file);
-        }
-        
-        if (system(cmd) != 0) {
-            error("assembly/linking failed");
-        }
-        
-        /* Remove temporary assembly file */
-        if (!asm_only) {
-            unlink(asm_file);
-        }
-    }
-    
-    return 0;
+    return result;
 }
