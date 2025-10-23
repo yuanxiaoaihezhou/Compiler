@@ -1006,9 +1006,50 @@ Initializer *parse_initializer(Token **rest, Token *tok, Type *ty) {
         
         if (is_zero_init) {
             /* Zero initializer - all elements/fields set to 0 */
-            /* For now, we don't generate any initialization code */
-            /* Local variables are already zeroed by the stack allocation */
+            /* We need to explicitly initialize all elements to 0 */
             *rest = skip(tok, "}");
+            
+            if (ty->kind == TY_ARRAY) {
+                /* Create initializers for each element */
+                int count = ty->array_len;
+                Initializer *cur = NULL;
+                for (int i = 0; i < count; i++) {
+                    Initializer *elem = new_initializer(ty->base);
+                    elem->is_expr = true;
+                    elem->expr = new_num(0);
+                    elem->index = i;
+                    
+                    if (cur) {
+                        cur->next = elem;
+                    } else {
+                        init->children = elem;
+                    }
+                    cur = elem;
+                }
+            } else if (ty->kind == TY_STRUCT) {
+                /* Create initializers for each member */
+                Member *mem = ty->members;
+                Initializer *cur = NULL;
+                int i = 0;
+                for (; mem; mem = mem->next, i++) {
+                    Initializer *elem = new_initializer(mem->ty);
+                    elem->is_expr = true;
+                    elem->expr = new_num(0);
+                    elem->index = i;
+                    
+                    if (cur) {
+                        cur->next = elem;
+                    } else {
+                        init->children = elem;
+                    }
+                    cur = elem;
+                }
+            } else {
+                /* Simple type - just set to 0 */
+                init->is_expr = true;
+                init->expr = new_num(0);
+            }
+            
             return init;
         }
         
