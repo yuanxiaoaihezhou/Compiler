@@ -76,6 +76,17 @@ static void gen_addr(ASTNode *node) {
         return;
     }
     
+    if (node->kind == ND_MEMBER) {
+        /* Generate address of struct member */
+        /* First get address of the struct itself */
+        gen_addr(node->lhs);
+        /* Then add the member offset */
+        if (node->member && node->member->offset > 0) {
+            emit("  add rax, %d", node->member->offset);
+        }
+        return;
+    }
+    
     error("not an lvalue");
 }
 
@@ -109,6 +120,22 @@ static void gen_expr_asm(ASTNode *node) {
                 emit("  movsx rax, byte ptr [rax]");
             } else if (node->ty && node->ty->size == 4) {
                 emit("  movsxd rax, dword ptr [rax]");
+            } else {
+                emit("  mov rax, [rax]");
+            }
+            return;
+        case ND_MEMBER:
+            /* Generate address and load value */
+            gen_addr(node);
+            /* Load with correct size based on member type */
+            if (node->member && node->member->ty) {
+                if (node->member->ty->size == 1) {
+                    emit("  movsx rax, byte ptr [rax]");
+                } else if (node->member->ty->size == 4) {
+                    emit("  movsxd rax, dword ptr [rax]");
+                } else {
+                    emit("  mov rax, [rax]");
+                }
             } else {
                 emit("  mov rax, [rax]");
             }

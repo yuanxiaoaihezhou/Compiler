@@ -170,6 +170,61 @@ static int gen_expr(ASTNode *node) {
             /* Type conversion is handled at code generation */
             return gen_expr(node->lhs);
         }
+        case ND_MEMBER: {
+            /* Generate address of struct member */
+            /* struct_addr = address of lhs (the struct) */
+            int struct_reg = gen_expr(node->lhs);
+            
+            /* For member access, we need to:
+             * 1. Get the address of the struct
+             * 2. Add the member offset to get member address
+             * 3. Load the value from that address
+             */
+            
+            /* If lhs is not already an address, we need special handling */
+            /* For now, assume lhs gives us a value and we need to get its address */
+            /* This is tricky - for x.member, x might be a variable (need address) */
+            /* Let's handle the common case where lhs is ND_VAR or ND_DEREF */
+            
+            int member_addr;
+            if (node->lhs->kind == ND_VAR) {
+                /* Get address of the variable */
+                IR *addr_ir = new_ir(IR_ADDR);
+                addr_ir->dst = new_reg();
+                addr_ir->name = node->lhs->var->name;
+                add_ir(addr_ir);
+                member_addr = addr_ir->dst;
+            } else if (node->lhs->kind == ND_DEREF) {
+                /* For ptr->member (which becomes (*ptr).member), 
+                 * lhs is ND_DEREF, so we want the address that would be dereferenced */
+                member_addr = gen_expr(node->lhs->lhs);
+            } else {
+                /* For other cases, use the evaluated result as an address */
+                member_addr = struct_reg;
+            }
+            
+            /* Add member offset */
+            if (node->member && node->member->offset > 0) {
+                IR *offset_ir = new_ir(IR_MOV);
+                offset_ir->dst = new_reg();
+                offset_ir->imm = node->member->offset;
+                add_ir(offset_ir);
+                
+                IR *add_ir_inst = new_ir(IR_ADD);
+                add_ir_inst->lhs = member_addr;
+                add_ir_inst->rhs = offset_ir->dst;
+                add_ir_inst->dst = new_reg();
+                add_ir(add_ir_inst);
+                member_addr = add_ir_inst->dst;
+            }
+            
+            /* Load value from member address */
+            IR *load = new_ir(IR_LOAD);
+            load->dst = new_reg();
+            load->lhs = member_addr;
+            add_ir(load);
+            return load->dst;
+        }
         default:
             error("unsupported expression in IR generation");
             return 0;

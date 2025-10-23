@@ -244,27 +244,32 @@ static ASTNode *postfix(Token **rest, Token *tok) {
         
         /* Member access */
         if (equal(tok, ".")) {
-            node = new_node(ND_MEMBER);
-            node->lhs = node;
+            ASTNode *member_node = new_node(ND_MEMBER);
+            member_node->lhs = node;
             tok = tok->next;
             if (tok->kind != TK_IDENT) {
                 error_tok(tok, "expected member name");
             }
-            /* Member resolution will be done in type checking */
+            /* Store member name temporarily in funcname field */
+            member_node->funcname = strndup_custom(tok->str, tok->len);
             tok = tok->next;
+            node = member_node;
             continue;
         }
         
         /* Pointer member access */
         if (equal(tok, "->")) {
             ASTNode *deref = new_binary(ND_DEREF, node, NULL);
-            node = new_node(ND_MEMBER);
-            node->lhs = deref;
+            ASTNode *member_node = new_node(ND_MEMBER);
+            member_node->lhs = deref;
             tok = tok->next;
             if (tok->kind != TK_IDENT) {
                 error_tok(tok, "expected member name");
             }
+            /* Store member name temporarily in funcname field */
+            member_node->funcname = strndup_custom(tok->str, tok->len);
             tok = tok->next;
+            node = member_node;
             continue;
         }
         
