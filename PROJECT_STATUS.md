@@ -180,12 +180,17 @@ make bootstrap-test      # 用自举编译器运行测试套件
 ## 自举状态
 
 编译器具备部分自举能力：
-- ✅ 可以编译简单到中等复杂度的C程序
-- ✅ 所有测试程序都能正确编译和运行
-- ✅ 提供了源代码合并工具用于多文件编译
-- ✅ Makefile提供了完整的多阶段自举选项（bootstrap、bootstrap-stage1、bootstrap-stage2、bootstrap-full、bootstrap-test）
-- ✅ 已实现typedef、enum、static、extern、const等关键特性
-- ⚠️ 完全自举（编译自身）需要实现switch语句和可变参数函数
+- ✓ 可以编译简单到中等复杂度的C程序
+- ✓ 所有测试程序都能正确编译和运行  
+- ✓ 提供了源代码合并工具用于创建单一翻译单元
+- ✓ Makefile提供了完整的多阶段自举选项（bootstrap、bootstrap-stage1、bootstrap-stage2、bootstrap-full、bootstrap-test）
+- ✓ 已实现typedef、enum、static、extern、const等关键特性
+- ✗ **结构体成员访问未实现** - parser能解析 `.` 和 `->` 但IR生成和代码生成不支持
+  - 这是自举的主要阻塞因素
+  - 编译器源代码大量使用结构体（Symbol, ASTNode, Type, CompilerState等）
+  - 任何使用结构体成员的代码都会导致编译器崩溃
+- ✗ 模块化编译自举被阻止 - 需要先实现结构体成员访问
+- ⚠️ 完全自举需要实现结构体成员访问和复杂初始化器
 
 详见 `docs/SELF_HOSTING.md` 了解完整自举所需的功能和各个自举阶段的说明。
 

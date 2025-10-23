@@ -29,7 +29,7 @@ COMPILER = $(BUILD_DIR)/mycc
 # Test files
 TEST_SRCS = $(wildcard $(TEST_DIR)/*.c)
 
-.PHONY: all clean test doc bootstrap bootstrap-stage1 bootstrap-stage2 bootstrap-full bootstrap-test install bootstrap-modular bootstrap-stage1-modular
+.PHONY: all clean test doc bootstrap bootstrap-stage1 bootstrap-stage2 bootstrap-full bootstrap-test install bootstrap-stage1-modular help
 
 all: $(COMPILER)
 
@@ -70,9 +70,18 @@ bootstrap: $(COMPILER)
 	@cp $(BUILD_DIR)/mycc-stage0 $(COMPILER)
 
 # Bootstrap Stage 1: compile compiler with GCC-compiled compiler (modular approach)
+# NOTE: This approach does NOT currently work because the compiler lacks struct member
+# access support (. and ->). The parser creates ND_MEMBER nodes but IR and codegen
+# don't handle them, causing a segfault when compiling ANY code with struct member access.
+# The compiler's own source code uses structs extensively, so this blocks self-compilation.
+# This target is kept as documentation of the "correct" approach for when struct support is added.
 bootstrap-stage1-modular: $(COMPILER)
 	@echo "Bootstrap Stage 1 (Modular) - Compile with stage 0"
 	@echo "===================================================="
+	@echo "⚠️  WARNING: This target does NOT work due to missing struct member access support"
+	@echo "   The compiler will segfault when trying to compile code with struct members."
+	@echo "   This is kept for future use when struct support is implemented."
+	@echo ""
 	@echo "Building stage 0 compiler with GCC..."
 	@mkdir -p $(BUILD_DIR)/bootstrap
 	@cp $(COMPILER) $(BUILD_DIR)/mycc-stage0
@@ -108,10 +117,15 @@ bootstrap-stage1-modular: $(COMPILER)
 		exit 1; \
 	fi
 
-# Bootstrap Stage 1: compile compiler with GCC-compiled compiler
+# Bootstrap Stage 1: compile compiler with GCC-compiled compiler (combined file approach)
+# NOTE: This uses tools/combine.sh to create a single source file as a workaround.
+# Even this approach currently fails due to missing struct member access support.
+# The combined file approach is kept because it's simpler to debug than modular compilation.
 bootstrap-stage1: $(COMPILER)
-	@echo "Bootstrap Stage 1 - Compile with stage 0"
-	@echo "=========================================="
+	@echo "Bootstrap Stage 1 - Compile with stage 0 (Combined File Approach)"
+	@echo "=================================================================="
+	@echo "⚠️  WARNING: Even this approach currently fails due to missing struct support"
+	@echo ""
 	@echo "Building stage 0 compiler with GCC..."
 	@mkdir -p $(BUILD_DIR)
 	@cp $(COMPILER) $(BUILD_DIR)/mycc-stage0
@@ -127,9 +141,9 @@ bootstrap-stage1: $(COMPILER)
 		echo "✓ Stage 1 compiler is functional!" || \
 		(echo "✗ Stage 1 compiler failed runtime test"; exit 1); \
 	else \
-		echo "✗ Stage 1 compilation failed (expected - missing features)"; \
+		echo "✗ Stage 1 compilation failed (expected - missing struct member access)"; \
 		echo "Error log saved to $(BUILD_DIR)/bootstrap-stage1.log"; \
-		echo "This is normal - full self-hosting requires additional C features."; \
+		echo "This is normal - self-hosting requires struct member access support."; \
 		echo "See docs/SELF_HOSTING.md for required features."; \
 		exit 1; \
 	fi
@@ -237,19 +251,23 @@ clean:
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  all              - Build the compiler (default)"
-	@echo "  test             - Run test suite"
-	@echo "  doc              - Generate documentation"
-	@echo "  bootstrap        - Basic bootstrap test (compile test programs)"
-	@echo "  bootstrap-stage1 - Stage 1: Compile compiler with GCC-built compiler"
-	@echo "  bootstrap-stage2 - Stage 2: Compile compiler with stage 1 compiler"
-	@echo "  bootstrap-full   - Full 3-stage bootstrap with verification"
-	@echo "  bootstrap-test   - Run all tests with bootstrapped compiler"
-	@echo "  install          - Install compiler to /usr/local/bin"
-	@echo "  clean            - Remove build artifacts"
+	@echo "  all                      - Build the compiler (default)"
+	@echo "  test                     - Run test suite (✓ all tests pass)"
+	@echo "  doc                      - Generate documentation"
+	@echo "  bootstrap                - Basic bootstrap test (✓ works - compiles simple programs)"
+	@echo "  bootstrap-stage1         - Stage 1: Combined file approach (✗ fails - missing struct support)"
+	@echo "  bootstrap-stage1-modular - Stage 1: Modular approach (✗ fails - missing struct support)"
+	@echo "  bootstrap-stage2         - Stage 2: Requires stage 1 to work first"
+	@echo "  bootstrap-full           - Full 3-stage bootstrap (requires stage 1 to work first)"
+	@echo "  bootstrap-test           - Run all tests with bootstrapped compiler (requires stage 1)"
+	@echo "  install                  - Install compiler to /usr/local/bin"
+	@echo "  clean                    - Remove build artifacts"
 	@echo ""
 	@echo "Bootstrap stages:"
-	@echo "  Stage 0: GCC compiles compiler → mycc-stage0"
-	@echo "  Stage 1: mycc-stage0 compiles compiler → mycc-stage1"
-	@echo "  Stage 2: mycc-stage1 compiles compiler → mycc-stage2"
+	@echo "  Stage 0: GCC compiles compiler → mycc-stage0 (✓ works)"
+	@echo "  Stage 1: mycc-stage0 compiles compiler → mycc-stage1 (✗ blocked by missing struct support)"
+	@echo "  Stage 2: mycc-stage1 compiles compiler → mycc-stage2 (requires stage 1)"
 	@echo "  Verify: Check stage1 and stage2 produce identical results"
+	@echo ""
+	@echo "⚠️  Self-hosting is currently BLOCKED by missing struct member access (. and ->)"
+	@echo "   See docs/SELF_HOSTING.md for details on what features are needed."

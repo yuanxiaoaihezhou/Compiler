@@ -231,16 +231,19 @@ All 15 tests passing:
 - Compiler builds successfully with GCC
 - All tests pass
 
-**Stage 1 (Self-compilation):** ⚠️ In Progress
-- Many features now implemented
-- Still missing some complex initializers
-- Progress is significant - gets much further than before
+**Stage 1 (Self-compilation):** ❌ BLOCKED
+- **Critical blocker: Struct member access (. and ->) not implemented**
+- Parser creates ND_MEMBER nodes but IR and codegen don't handle them
+- Causes segfault when compiling ANY code with struct member access
+- Compiler source uses structs extensively (Symbol, ASTNode, Type, CompilerState, etc.)
+- Both modular and combined file approaches fail
 
 **Remaining blockers for full bootstrap:**
-1. String array initializers (e.g., `char *arr[] = {"str1", "str2"}`)
-2. Struct array initializers (e.g., keyword tables)
-3. Global variable initialization with braces
-4. Some advanced preprocessor features
+1. **CRITICAL: Struct member access** - Must be implemented in ir.c and codegen.c
+2. String array initializers (e.g., `char *arr[] = {"str1", "str2"}`)
+3. Struct array initializers (e.g., keyword tables)
+4. Global variable initialization with braces
+5. Some advanced preprocessor features
 
 ## Code Statistics
 
@@ -296,11 +299,14 @@ All 15 tests passing:
 
 ## Conclusion
 
-Significant progress has been made toward self-hosting:
-- 6 major C language features implemented
-- Preprocessor greatly enhanced
-- Documentation updated
-- All tests passing
-- Bootstrap progressing much further
-
-The compiler is now much closer to being able to compile itself. The remaining work is primarily around complex data initialization, which is a well-defined problem with clear implementation paths.
+Significant progress has been made toward understanding the path to self-hosting:
+- 6 major C language features implemented (cast, ++/--, C99 for, sizeof(type), void return)
+- Preprocessor greatly enhanced with system header stubs
+- Documentation comprehensively updated
+- All 15 tests passing
+- **Critical discovery**: Struct member access is the main blocker for self-hosting
+  - Parser supports it (creates ND_MEMBER nodes)
+  - IR and codegen do NOT support it (causes segfault)
+  - This must be implemented before any bootstrap attempt can succeed
+  
+The compiler is now well-documented and ready for the next phase: implementing struct member access support in the IR generator and code generator.

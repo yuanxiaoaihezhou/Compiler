@@ -53,6 +53,14 @@ The following features are used in the compiler source but not yet implemented:
 - [x] Void return statements (`return;`) ✓ IMPLEMENTED (2024-10-22)
 
 ### Critical Features (Still Needed for Full Self-Hosting)
+
+**BLOCKER:** Struct member access (`.` and `->`) is NOT implemented in IR/code generation!
+- [ ] **Struct member access** - Parser creates ND_MEMBER nodes but IR and codegen don't handle them
+  - Causes segfault when compiling ANY code with struct member access  
+  - Blocks ALL attempts at modular self-compilation
+  - Compiler source uses structs extensively (Symbol, ASTNode, Type, CompilerState, etc.)
+  
+**Other missing features:**
 - [ ] String array initializers (`char *arr[] = {"str1", "str2"}`) - **Used in compiler source**
 - [ ] Array of struct initializers - **Used for keywords array**
 - [ ] Global variable initialization with brace initializers
@@ -106,9 +114,9 @@ To achieve full self-hosting, implement features in this order:
 
 ## Current Bootstrap Test
 
-The Makefile now provides comprehensive bootstrap testing options:
+The Makefile provides comprehensive bootstrap testing options. However, **modular compilation does not currently work** due to missing struct member access support in the compiler.
 
-### Basic Bootstrap (make bootstrap)
+### Basic Bootstrap (make bootstrap) - ✓ WORKS
 Tests that the compiler can compile simple programs:
 ```bash
 make bootstrap
@@ -116,23 +124,44 @@ make bootstrap
 
 This:
 1. Compiles the compiler with GCC (stage 0)
-2. Creates a combined source file
+2. Creates a combined source file (workaround for missing features)
 3. Tests the stage 0 compiler with basic test programs
 4. Verifies correct execution
 
-### Stage 1 Bootstrap (make bootstrap-stage1)
-Attempts to compile the compiler with itself:
+**Status: WORKING** - Demonstrates compiler can handle simple C programs
+
+### Modular Bootstrap (make bootstrap-stage1-modular) - ✗ BLOCKED
+**This approach does NOT work** due to compiler limitations:
+```bash
+make bootstrap-stage1-modular  # Will fail
+```
+
+**Why it fails:**
+- Compiler lacks struct member access (`.` and `->`) in IR/code generation
+- Parser creates ND_MEMBER nodes but they're not handled in gen_ir() or gen_expr_asm()
+- Results in segfault when compiling ANY code with struct member access
+- Compiler's own source uses structs extensively (Symbol, ASTNode, Type, CompilerState)
+
+**What would be needed:**
+1. Implement ND_MEMBER handling in ir.c (calculate member offset, generate address)
+2. Implement ND_MEMBER handling in codegen.c (generate assembly for member access)
+3. Support both `.` (struct) and `->` (pointer to struct)
+4. Handle nested struct access
+5. Add tests for struct operations
+
+### Stage 1 Bootstrap (make bootstrap-stage1) - ⚠️ PARTIAL
+Attempts to compile the compiler with itself using combined source approach:
 ```bash
 make bootstrap-stage1
 ```
 
 This:
 1. Compiles the compiler with GCC (stage 0 → mycc-stage0)
-2. Creates combined source file (mycc_combined.c)
+2. Creates combined source file (mycc_combined.c) - single translation unit
 3. Attempts to compile mycc_combined.c with mycc-stage0 → mycc-stage1
 4. Tests the stage 1 compiler if compilation succeeds
 
-**Current Status**: Fails due to missing language features (expected)
+**Current Status**: Even combined approach still requires struct support, currently FAILS
 
 ### Stage 2 Bootstrap (make bootstrap-stage2)
 Compiles the compiler with the stage 1 compiler:
