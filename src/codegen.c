@@ -133,6 +133,9 @@ static void gen_addr(ASTNode *node) {
 
 /* Generate assembly for expression */
 static void gen_expr_asm(ASTNode *node) {
+    if (!node) {
+        error("gen_expr_asm called with NULL node");
+    }
     switch (node->kind) {
         case ND_NUM:
             emit("  mov rax, %d", node->val);
@@ -279,7 +282,12 @@ static void gen_expr_asm(ASTNode *node) {
             gen_addr(node->lhs); /* Get address of ap */
             push("rax");
             
-            int stack_size = current_function ? current_function->stack_size : 0;
+            int stack_size;
+            if (current_function) {
+                stack_size = current_function->stack_size;
+            } else {
+                stack_size = 0;
+            }
             int locals_end = stack_size - 48; /* Where locals end (before register area) */
             int vararg_offset = locals_end + 40; /* Offset to rsi in register save area */
             
@@ -297,7 +305,12 @@ static void gen_expr_asm(ASTNode *node) {
             push("rax"); /* Save ap value on stack */
             
             /* Load the argument value with correct size based on type */
-            int arg_size = node->ty ? node->ty->size : 8;
+            int arg_size;
+            if (node->ty) {
+                arg_size = node->ty->size;
+            } else {
+                arg_size = 8;
+            }
             if (arg_size == 1) {
                 emit("  movsx rax, byte ptr [rax]");
             } else if (arg_size == 4) {
