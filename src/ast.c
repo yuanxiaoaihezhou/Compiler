@@ -144,6 +144,9 @@ void add_type(ASTNode *node) {
         case ND_DEREF:
             if (node->lhs->ty->kind == TY_PTR) {
                 node->ty = node->lhs->ty->base;
+            } else if (node->lhs->ty->kind == TY_ARRAY) {
+                /* Array decay: treat array as pointer to first element */
+                node->ty = node->lhs->ty->base;
             } else {
                 node->ty = new_type(TY_INT, 4, 4);
             }
