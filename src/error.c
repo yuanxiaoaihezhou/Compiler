@@ -1,5 +1,4 @@
 #include "compiler.h"
-#include <errno.h>
 
 /* Print error message and exit */
 void error(char *fmt, ...) {

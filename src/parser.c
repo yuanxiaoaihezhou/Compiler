@@ -137,6 +137,14 @@ static Symbol *new_lvar(char *name, Type *ty) {
 
 /* Create new global variable */
 static Symbol *new_gvar(char *name, Type *ty) {
+    /* Check if variable already exists */
+    for (Symbol *var = globals; var; var = var->next) {
+        if (strcmp(var->name, name) == 0) {
+            /* Variable already exists - return it */
+            return var;
+        }
+    }
+    
     Symbol *var = calloc(1, sizeof(Symbol));
     var->name = name;
     var->ty = ty;
