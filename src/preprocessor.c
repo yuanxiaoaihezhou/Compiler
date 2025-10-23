@@ -156,14 +156,22 @@ static void add_define(const char *name, const char *value) {
         if (strcmp(defines[i].name, name) == 0) {
             /* Redefine */
             if (defines[i].value) free(defines[i].value);
-            defines[i].value = value ? strdup_custom(value) : NULL;
+            if (value) {
+                defines[i].value = strdup_custom(value);
+            } else {
+                defines[i].value = NULL;
+            }
             return;
         }
     }
     
     /* Add new define */
     defines[define_count].name = strdup_custom(name);
-    defines[define_count].value = value ? strdup_custom(value) : NULL;
+    if (value) {
+        defines[define_count].value = strdup_custom(value);
+    } else {
+        defines[define_count].value = NULL;
+    }
     define_count++;
 }
 
@@ -401,7 +409,10 @@ static void process_define(char *line) {
         value_end++;
     }
     
-    char *value = (p > value_start) ? strndup_custom(value_start, p - value_start) : NULL;
+    char *value = NULL;
+    if (p > value_start) {
+        value = strndup_custom(value_start, p - value_start);
+    }
     
     add_define(name, value);
     
@@ -444,7 +455,11 @@ static char *preprocess_recursive(char *input, int *out_len) {
             } else if (strncmp(p, "ifndef", 6) == 0 || strncmp(p, "ifdef", 5) == 0) {
                 /* Parse condition */
                 bool is_ifndef = (strncmp(p, "ifndef", 6) == 0);
-                p += is_ifndef ? 6 : 5;
+                if (is_ifndef) {
+                    p += 6;
+                } else {
+                    p += 5;
+                }
                 while (isspace(*p)) p++;
                 
                 char *name_start = p;
@@ -452,7 +467,12 @@ static char *preprocess_recursive(char *input, int *out_len) {
                 char *name = strndup_custom(name_start, p - name_start);
                 
                 bool defined = is_defined(name);
-                bool condition = is_ifndef ? !defined : defined;
+                bool condition;
+                if (is_ifndef) {
+                    condition = !defined;
+                } else {
+                    condition = defined;
+                }
                 
                 if (skip_depth < 0 && !condition) {
                     skip_depth = if_depth;

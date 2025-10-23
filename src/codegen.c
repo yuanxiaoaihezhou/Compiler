@@ -55,10 +55,12 @@ static void assign_lvar_offsets(Symbol *fn) {
     int offset = 0;
     for (Symbol *var = fn->locals; var; var = var->next) {
         offset += var->ty->size;
-        offset = (offset + 7) & ~7; /* Align to 8 bytes */
+        /* Align to 8 bytes: round up to next multiple of 8 */
+        offset = ((offset + 7) / 8) * 8;
         var->offset = offset;
     }
-    fn->stack_size = (offset + 15) & ~15; /* Align to 16 bytes */
+    /* Align to 16 bytes: round up to next multiple of 16 */
+    fn->stack_size = ((offset + 15) / 16) * 16;
 }
 
 /* Load variable address */
@@ -199,7 +201,13 @@ static void gen_expr_asm(ASTNode *node) {
                 push("rax");
             }
             
-            for (i = nargs < 6 ? nargs - 1 : 5; i >= 0; i--) {
+            int end_i;
+            if (nargs < 6) {
+                end_i = nargs - 1;
+            } else {
+                end_i = 5;
+            }
+            for (i = end_i; i >= 0; i--) {
                 pop(argregs[i]);
             }
             
@@ -237,7 +245,10 @@ static void gen_expr_asm(ASTNode *node) {
         case ND_ADD:
             /* Handle pointer arithmetic - scale the right operand if left is a pointer */
             if (node->lhs->ty && (node->lhs->ty->kind == TY_PTR || node->lhs->ty->kind == TY_ARRAY)) {
-                int size = node->lhs->ty->base ? node->lhs->ty->base->size : 1;
+                int size = 1;
+                if (node->lhs->ty->base) {
+                    size = node->lhs->ty->base->size;
+                }
                 if (size > 1) {
                     emit("  imul rdi, %d", size);
                 }

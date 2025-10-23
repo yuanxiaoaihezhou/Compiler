@@ -41,8 +41,12 @@ void error_at(char *loc, char *fmt, ...) {
     int pos = loc - line;
     
     /* Print error location with color */
+    char *filename = "unknown";
+    if (compiler_state) {
+        filename = compiler_state->current_file;
+    }
     fprintf(stderr, "\033[1m%s:%d:%d: \033[31merror:\033[0m ", 
-            compiler_state ? compiler_state->current_file : "unknown", line_num, pos + 1);
+            filename, line_num, pos + 1);
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     
@@ -98,8 +102,12 @@ void error_tok(Token *tok, char *fmt, ...) {
         }
         fprintf(stderr, "\033[0m\n");
     } else if (tok) {
+        char *filename = "unknown";
+        if (tok->filename) {
+            filename = tok->filename;
+        }
         fprintf(stderr, "\033[1m%s:%d: \033[31merror:\033[0m ", 
-                tok->filename ? tok->filename : "unknown", tok->line);
+                filename, tok->line);
         vfprintf(stderr, fmt, ap);
         fprintf(stderr, "\n");
     } else {
@@ -148,8 +156,12 @@ void note_tok(Token *tok, char *fmt, ...) {
         /* Print note indicator */
         fprintf(stderr, "      | %*s\033[36m^\033[0m\n", pos, "");
     } else if (tok) {
+        char *filename = "unknown";
+        if (tok->filename) {
+            filename = tok->filename;
+        }
         fprintf(stderr, "\033[1m%s:%d: \033[36mnote:\033[0m ", 
-                tok->filename ? tok->filename : "unknown", tok->line);
+                filename, tok->line);
         vfprintf(stderr, fmt, ap);
         fprintf(stderr, "\n");
     } else {
