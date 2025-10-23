@@ -263,6 +263,58 @@ static void gen_expr_asm(ASTNode *node) {
             gen_expr_asm(node->lhs);
             gen_expr_asm(node->rhs);
             return;
+        case ND_VA_START: {
+            /* va_start(ap, last_param)
+             * In x86_64 System V ABI, variadic args come after register args
+             * We need to make ap point to where the variadic args start
+             * ap should point to a location on stack after the last named parameter
+             * 
+             * For simplicity, we set ap = address of first variadic arg on stack
+             * The caller puts variadic args on stack after register args
+             * ap = rbp + 16 (return addr + saved rbp) = start of stack args
+             */
+            gen_addr(node->lhs); /* Get address of ap */
+            push("rax");
+            /* Calculate address of first variadic argument */
+            /* Stack layout: [rbp+16] is first stack argument */
+            emit("  lea rax, [rbp+16]");
+            pop("rdi");
+            emit("  mov [rdi], rax"); /* Store in ap */
+            return;
+        }
+        case ND_VA_ARG: {
+            /* va_arg(ap, type)
+             * Read value from current ap position and advance ap
+             * Returns the value
+             */
+            gen_expr_asm(node->lhs); /* Get value of ap (pointer to current arg) */
+            push("rax"); /* Save ap value */
+            
+            /* Load the argument value */
+            emit("  mov rax, [rax]"); /* rax = *ap */
+            push("rax"); /* Save the value to return */
+            
+            /* Advance ap by argument size (rounded up to 8 bytes for alignment) */
+            int arg_size = node->ty ? node->ty->size : 8;
+            if (arg_size < 8) arg_size = 8; /* Minimum 8 bytes on x86_64 */
+            pop("rax"); /* Get the value to return */
+            pop("rdi"); /* Get ap */
+            
+            /* Update ap: ap += arg_size */
+            gen_addr(node->lhs); /* Get address of ap again */
+            emit("  mov rdi, [rax]"); /* rdi = old ap value */
+            emit("  add rdi, %d", arg_size); /* rdi = ap + arg_size */
+            emit("  mov [rax], rdi"); /* *ap_addr = new ap value */
+            
+            /* Return value is already in rax from the pop above */
+            return;
+        }
+        case ND_VA_END:
+            /* va_end(ap) is a no-op on x86_64 */
+            /* Just evaluate ap for side effects (if any) */
+            gen_expr_asm(node->lhs);
+            emit("  mov rax, 0"); /* Return 0 */
+            return;
     }
     
     /* Binary operations */
