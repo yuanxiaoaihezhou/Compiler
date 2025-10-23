@@ -536,6 +536,16 @@ static ASTNode *assign(Token **rest, Token *tok) {
     
     if (equal(tok, "=")) {
         node = new_binary(ND_ASSIGN, node, assign(&tok, tok->next));
+    } else if (tok->kind == TK_PLUS_ASSIGN) {
+        /* a += b becomes a = a + b */
+        ASTNode *rhs = assign(&tok, tok->next);
+        ASTNode *add = new_binary(ND_ADD, copy_node(node), rhs);
+        node = new_binary(ND_ASSIGN, node, add);
+    } else if (tok->kind == TK_MINUS_ASSIGN) {
+        /* a -= b becomes a = a - b */
+        ASTNode *rhs = assign(&tok, tok->next);
+        ASTNode *sub = new_binary(ND_SUB, copy_node(node), rhs);
+        node = new_binary(ND_ASSIGN, node, sub);
     }
     
     *rest = tok;

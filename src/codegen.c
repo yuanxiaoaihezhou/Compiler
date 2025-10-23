@@ -3,6 +3,7 @@
 static FILE *output;
 static int stack_depth;
 static Symbol *current_function;
+static int label_count = 0;
 
 /* Forward declaration */
 static void gen_expr_asm(ASTNode *node);
@@ -318,12 +319,23 @@ static void gen_expr_asm(ASTNode *node) {
             emit("  mov rcx, rdi");
             emit("  shr rax, cl");
             return;
+        case ND_COND: {
+            /* Conditional expression: cond ? then : els */
+            int c = label_count++;
+            gen_expr_asm(node->cond);
+            emit("  cmp rax, 0");
+            emit("  je .L.else.%d", c);
+            gen_expr_asm(node->then);
+            emit("  jmp .L.end.%d", c);
+            emit(".L.else.%d:", c);
+            gen_expr_asm(node->els);
+            emit(".L.end.%d:", c);
+            return;
+        }
     }
     
     error("invalid expression");
 }
-
-static int label_count = 0;
 
 /* Generate assembly for statement */
 static void gen_stmt_asm(ASTNode *node) {
