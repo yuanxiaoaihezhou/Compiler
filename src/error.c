@@ -16,6 +16,15 @@ void error_at(char *loc, char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     
+    /* Check if we have a valid compiler state */
+    if (!compiler_state || !compiler_state->current_file) {
+        fprintf(stderr, "\033[1m\033[31merror:\033[0m ");
+        vfprintf(stderr, fmt, ap);
+        fprintf(stderr, "\n");
+        va_end(ap);
+        exit(1);
+    }
+    
     /* Find line start */
     char *line = loc;
     while (line > compiler_state->current_file && line[-1] != '\n') {
@@ -40,10 +49,7 @@ void error_at(char *loc, char *fmt, ...) {
     int pos = loc - line;
     
     /* Print error location with color */
-    char *filename = "unknown";
-    if (compiler_state) {
-        filename = compiler_state->current_file;
-    }
+    char *filename = compiler_state->current_file;
     fprintf(stderr, "\033[1m%s:%d:%d: \033[31merror:\033[0m ", 
             filename, line_num, pos + 1);
     vfprintf(stderr, fmt, ap);

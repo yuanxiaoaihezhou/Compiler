@@ -103,6 +103,8 @@ bootstrap-stage1-modular: $(COMPILER)
 	done; \
 	if [ "$$SUCCESS" = "true" ]; then \
 		echo ""; \
+		echo "Compiling runtime support with GCC..."; \
+		gcc $(CFLAGS) -c $(SRC_DIR)/runtime.c -o $(BUILD_DIR)/bootstrap/runtime.o && \
 		echo "Linking object files..."; \
 		gcc $(BUILD_DIR)/bootstrap/*.o -o $(BUILD_DIR)/mycc-stage1 2>$(BUILD_DIR)/bootstrap-link.log && \
 		echo "✓ Stage 1 compilation and linking succeeded!" && \
