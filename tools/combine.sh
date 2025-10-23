@@ -27,7 +27,7 @@ grep -v "^#include" src/compiler.h | grep -v "^#ifndef COMPILER_H" | grep -v "^#
 echo "" >> "$OUTPUT"
 
 # Add each C file (without #includes)
-for file in src/utils.c src/error.c src/ast.c src/lexer.c src/parser.c src/ir.c src/optimizer.c src/codegen.c src/preprocessor.c src/main.c; do
+for file in src/runtime.c src/utils.c src/error.c src/ast.c src/lexer.c src/parser.c src/ir.c src/optimizer.c src/codegen.c src/preprocessor.c src/main.c; do
     echo "/* ========== $file ========== */" >> "$OUTPUT"
     grep -v "^#include" "$file" >> "$OUTPUT"
     echo "" >> "$OUTPUT"

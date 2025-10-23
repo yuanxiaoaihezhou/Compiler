@@ -78,9 +78,9 @@ bootstrap: $(COMPILER)
 bootstrap-stage1-modular: $(COMPILER)
 	@echo "Bootstrap Stage 1 (Modular) - Compile with stage 0"
 	@echo "===================================================="
-	@echo "⚠️  WARNING: This target does NOT work due to missing struct member access support"
-	@echo "   The compiler will segfault when trying to compile code with struct members."
-	@echo "   This is kept for future use when struct support is implemented."
+	@echo "⚠️  Stage 1 compiles successfully but has runtime crash on startup"
+	@echo "   All 10 source files compile and link, but the resulting binary segfaults."
+	@echo "   This appears to be a code generation or initialization issue."
 	@echo ""
 	@echo "Building stage 0 compiler with GCC..."
 	@mkdir -p $(BUILD_DIR)/bootstrap
@@ -103,6 +103,8 @@ bootstrap-stage1-modular: $(COMPILER)
 	done; \
 	if [ "$$SUCCESS" = "true" ]; then \
 		echo ""; \
+		echo "Compiling runtime support with GCC..."; \
+		gcc $(CFLAGS) -c $(SRC_DIR)/runtime.c -o $(BUILD_DIR)/bootstrap/runtime.o && \
 		echo "Linking object files..."; \
 		gcc $(BUILD_DIR)/bootstrap/*.o -o $(BUILD_DIR)/mycc-stage1 2>$(BUILD_DIR)/bootstrap-link.log && \
 		echo "✓ Stage 1 compilation and linking succeeded!" && \
@@ -124,7 +126,7 @@ bootstrap-stage1-modular: $(COMPILER)
 bootstrap-stage1: $(COMPILER)
 	@echo "Bootstrap Stage 1 - Compile with stage 0 (Combined File Approach)"
 	@echo "=================================================================="
-	@echo "⚠️  WARNING: Even this approach currently fails due to missing struct support"
+	@echo "⚠️  Stage 1 compiles successfully but has runtime crash on startup"
 	@echo ""
 	@echo "Building stage 0 compiler with GCC..."
 	@mkdir -p $(BUILD_DIR)
@@ -141,10 +143,8 @@ bootstrap-stage1: $(COMPILER)
 		echo "✓ Stage 1 compiler is functional!" || \
 		(echo "✗ Stage 1 compiler failed runtime test"; exit 1); \
 	else \
-		echo "✗ Stage 1 compilation failed (expected - missing struct member access)"; \
+		echo "✗ Stage 1 compilation failed"; \
 		echo "Error log saved to $(BUILD_DIR)/bootstrap-stage1.log"; \
-		echo "This is normal - self-hosting requires struct member access support."; \
-		echo "See docs/SELF_HOSTING.md for required features."; \
 		exit 1; \
 	fi
 

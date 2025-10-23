@@ -17,6 +17,36 @@ static void emit(char *fmt, ...) {
     va_end(ap);
 }
 
+/* Escape a string for assembly .string directive */
+static void emit_escaped_string(char *s) {
+    fprintf(output, "  .string \"");
+    for (char *p = s; *p; p++) {
+        int c = *p;
+        /* Convert to unsigned range 0-255 */
+        if (c < 0) {
+            c = c + 256;
+        }
+        if (c == 10) {  /* \n */
+            fprintf(output, "\\n");
+        } else if (c == 9) {  /* \t */
+            fprintf(output, "\\t");
+        } else if (c == 13) {  /* \r */
+            fprintf(output, "\\r");
+        } else if (c == 92) {  /* \\ */
+            fprintf(output, "\\\\");
+        } else if (c == 34) {  /* \" */
+            fprintf(output, "\\\"");
+        } else if (c >= 32 && c < 127) {
+            /* Printable ASCII */
+            fprintf(output, "%c", c);
+        } else {
+            /* Non-printable - use octal escape */
+            fprintf(output, "\\%03o", c);
+        }
+    }
+    fprintf(output, "\"\n");
+}
+
 /* Register name lookup tables (global for self-hosting compatibility) */
 static char *regs64[] = {"rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9", "r10", "r11"};
 static char *regs32[] = {"eax", "edi", "esi", "edx", "ecx", "r8d", "r9d", "r10d", "r11d"};
@@ -558,16 +588,19 @@ void codegen(Symbol *prog, FILE *out) {
     /* Generate data section */
     emit(".data");
     for (Symbol *var = prog; var; var = var->next) {
-        if (!var->is_function && !var->is_local) {
-            emit(".globl %s", var->name);
+        if (!var->is_function && !var->is_local && !var->is_extern) {
+            /* Only emit .globl for non-string-literal globals */
+            if (var->name[0] != '.' || var->name[1] != 'L' || var->name[2] != 'C') {
+                emit(".globl %s", var->name);
+            }
             emit("%s:", var->name);
             
             if (var->ty->kind == TY_ARRAY && var->ty->base->kind == TY_CHAR) {
                 /* String literal - use str_data if available */
                 if (var->str_data) {
-                    emit("  .string \"%s\"", var->str_data);
+                    emit_escaped_string(var->str_data);
                 } else {
-                    emit("  .string \"%s\"", var->name);
+                    emit_escaped_string(var->name);
                 }
             } else if (var->init) {
                 /* Global variable with initializer */

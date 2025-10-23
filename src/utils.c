@@ -1,5 +1,4 @@
 #include "compiler.h"
-#include <errno.h>
 
 CompilerState *compiler_state = NULL;
 
@@ -7,7 +6,7 @@ CompilerState *compiler_state = NULL;
 char *read_file(char *path) {
     FILE *fp = fopen(path, "r");
     if (!fp) {
-        error("cannot open %s: %s", path, strerror(errno));
+        error("cannot open %s", path);
     }
     
     /* Get file size */
