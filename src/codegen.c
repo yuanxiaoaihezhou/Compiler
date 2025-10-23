@@ -554,7 +554,15 @@ static void gen_function_asm(Symbol *fn) {
             }
         }
         if (local) {
-            emit("  mov [rbp-%d], %s", local->offset, argregs[i]);
+            /* Use appropriate register size based on parameter type */
+            if (param->ty && param->ty->size == 4) {
+                /* int parameter - use 32-bit register */
+                char *regs32_args[] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
+                emit("  mov [rbp-%d], %s", local->offset, regs32_args[i]);
+            } else {
+                /* pointer or other 64-bit parameter */
+                emit("  mov [rbp-%d], %s", local->offset, argregs[i]);
+            }
         }
     }
     
