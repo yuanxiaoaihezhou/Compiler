@@ -4,13 +4,23 @@
 
 ## 项目概述
 
-本项目是一个完整的编译器实现，包含以下编译阶段：
+本项目是一个完整的编译器实现，采用严格的流水线架构，包含以下编译阶段：
 1. 预处理（#include支持）
-2. 词法分析
-3. 语法分析
-4. 中间代码生成
-5. 优化
-6. 目标代码生成（x86_64汇编）
+2. 词法分析（Lexical Analysis）
+3. 语法分析（Syntax Analysis）
+4. 语义分析（Semantic Analysis）
+5. 中间代码生成（IR Generation）
+6. 优化（Optimization）
+7. 目标代码生成（x86_64汇编）
+8. 汇编与链接（Assembly & Linking）
+
+**新的流水线架构特点:**
+- 严格按照编译原理标准流程顺序执行
+- 每个阶段有明确的输入输出接口
+- 清晰的数据流和错误处理
+- 易于理解、维护和扩展
+
+详见 [流水线架构文档](docs/PIPELINE_ARCHITECTURE.md)
 
 ## 环境要求
 
@@ -163,7 +173,15 @@ make bootstrap-test
 
 ## 技术文档
 
-详细的技术文档请参阅：[docs/TECHNICAL.md](docs/TECHNICAL.md)
+详细的技术文档请参阅：
+- [流水线架构文档](docs/PIPELINE_ARCHITECTURE.md) - 新的流水线架构设计和实现
+- [技术文档](docs/TECHNICAL.md) - 详细技术说明
+
+**流水线架构文档** 包含：
+- 8个编译阶段的详细说明
+- 数据流图和接口定义
+- 每个阶段的功能和实现
+- 架构优势和未来改进方向
 
 包含以下内容：
 - 编译器架构
@@ -180,9 +198,12 @@ Compiler/
 ├── Makefile          # 构建系统
 ├── README.md         # 项目说明
 ├── docs/             # 文档
-│   └── TECHNICAL.md  # 技术文档
+│   ├── TECHNICAL.md  # 技术文档
+│   └── PIPELINE_ARCHITECTURE.md  # 流水线架构文档
 ├── src/              # 源代码
 │   ├── compiler.h    # 主头文件
+│   ├── pipeline.h    # 流水线框架头文件
+│   ├── pipeline.c    # 流水线框架实现
 │   ├── main.c        # 编译器驱动程序
 │   ├── lexer.c       # 词法分析器
 │   ├── parser.c      # 语法分析器
