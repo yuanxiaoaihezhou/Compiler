@@ -91,6 +91,14 @@ static void assign_lvar_offsets(Symbol *fn) {
     }
     /* Align to 16 bytes: round up to next multiple of 16 */
     fn->stack_size = ((offset + 15) / 16) * 16;
+    
+    /* For variadic functions, reserve additional space for register save area */
+    if (fn->is_variadic) {
+        /* Add 48 bytes for saving 6 registers (rdi, rsi, rdx, rcx, r8, r9) */
+        fn->stack_size += 48;
+        /* Re-align to 16 bytes */
+        fn->stack_size = ((fn->stack_size + 15) / 16) * 16;
+    }
 }
 
 /* Load variable address */
@@ -265,19 +273,17 @@ static void gen_expr_asm(ASTNode *node) {
             return;
         case ND_VA_START: {
             /* va_start(ap, last_param)
-             * In x86_64 System V ABI, variadic args come after register args
-             * We need to make ap point to where the variadic args start
-             * ap should point to a location on stack after the last named parameter
-             * 
-             * For simplicity, we set ap = address of first variadic arg on stack
-             * The caller puts variadic args on stack after register args
-             * ap = rbp + 16 (return addr + saved rbp) = start of stack args
-             */
+             * Set ap to point to the first variadic argument in the register save area
+             * For a function with 1 named parameter (in rdi), variadic args start at rsi
+             * The register save area starts after local variables */
             gen_addr(node->lhs); /* Get address of ap */
             push("rax");
-            /* Calculate address of first variadic argument */
-            /* Stack layout: [rbp+16] is first stack argument */
-            emit("  lea rax, [rbp+16]");
+            
+            int stack_size = current_function ? current_function->stack_size : 0;
+            int locals_end = stack_size - 48; /* Where locals end (before register area) */
+            int vararg_offset = locals_end + 40; /* Offset to rsi in register save area */
+            
+            emit("  lea rax, [rbp-%d]", vararg_offset);
             pop("rdi");
             emit("  mov [rdi], rax"); /* Store in ap */
             return;
@@ -288,25 +294,35 @@ static void gen_expr_asm(ASTNode *node) {
              * Returns the value
              */
             gen_expr_asm(node->lhs); /* Get value of ap (pointer to current arg) */
-            push("rax"); /* Save ap value */
+            push("rax"); /* Save ap value on stack */
             
-            /* Load the argument value */
-            emit("  mov rax, [rax]"); /* rax = *ap */
-            push("rax"); /* Save the value to return */
+            /* Load the argument value with correct size based on type */
+            int arg_size = node->ty ? node->ty->size : 8;
+            if (arg_size == 1) {
+                emit("  movsx rax, byte ptr [rax]");
+            } else if (arg_size == 4) {
+                emit("  movsxd rax, dword ptr [rax]");
+            } else {
+                emit("  mov rax, [rax]");
+            }
+            /* rax now contains the loaded value - save it */
+            push("rax"); /* Stack: [ap_value, loaded_value] */
             
             /* Advance ap by argument size (rounded up to 8 bytes for alignment) */
-            int arg_size = node->ty ? node->ty->size : 8;
-            if (arg_size < 8) arg_size = 8; /* Minimum 8 bytes on x86_64 */
-            pop("rax"); /* Get the value to return */
-            pop("rdi"); /* Get ap */
+            int aligned_size = arg_size;
+            if (aligned_size < 8) aligned_size = 8; /* Minimum 8 bytes on x86_64 */
             
-            /* Update ap: ap += arg_size */
-            gen_addr(node->lhs); /* Get address of ap again */
+            /* Update ap: get its address, load old value, add size, store back */
+            gen_addr(node->lhs); /* Get address of ap - rax = &ap */
             emit("  mov rdi, [rax]"); /* rdi = old ap value */
-            emit("  add rdi, %d", arg_size); /* rdi = ap + arg_size */
-            emit("  mov [rax], rdi"); /* *ap_addr = new ap value */
+            emit("  add rdi, %d", aligned_size); /* rdi = ap + aligned_size */
+            emit("  mov [rax], rdi"); /* *(&ap) = new ap value */
             
-            /* Return value is already in rax from the pop above */
+            /* Pop the loaded value - it's the return value */
+            pop("rax"); /* Stack: [ap_value], rax = loaded_value */
+            pop("rdi"); /* Stack: [], rdi = old ap value (discard) */
+            
+            /* Return value is in rax */
             return;
         }
         case ND_VA_END:
@@ -616,6 +632,28 @@ static void gen_function_asm(Symbol *fn) {
                 emit("  mov [rbp-%d], %s", local->offset, argregs[i]);
             }
         }
+    }
+    
+    /* For variadic functions, save ALL register arguments to a register save area
+     * This allows va_start/va_arg to access them from the stack
+     * The register save area is at the end of the stack frame, after local variables
+     * Since we already added 48 bytes to stack_size, the locals end at their original offset
+     * and the register area starts after that */
+    if (fn->is_variadic) {
+        emit("  /* Register save area for variadic function */");
+        
+        /* Calculate where local variables end (before we added the 48 bytes)
+         * We can determine this by subtracting 48 from stack_size and rounding */
+        int locals_end = fn->stack_size - 48;
+        
+        /* Save all 6 argument registers after the local variables
+         * In order so that incrementing the pointer moves through them */
+        emit("  mov [rbp-%d], rdi", locals_end + 48);
+        emit("  mov [rbp-%d], rsi", locals_end + 40);
+        emit("  mov [rbp-%d], rdx", locals_end + 32);
+        emit("  mov [rbp-%d], rcx", locals_end + 24);
+        emit("  mov [rbp-%d], r8", locals_end + 16);
+        emit("  mov [rbp-%d], r9", locals_end + 8);
     }
     
     stack_depth = 0;
