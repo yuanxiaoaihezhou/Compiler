@@ -69,7 +69,8 @@ typedef enum {
     ND_AND, ND_OR, ND_XOR, ND_SHL, ND_SHR, ND_NOT,
     ND_MEMBER, ND_CAST, ND_SIZEOF, ND_COMMA,
     ND_COND, ND_BREAK, ND_CONTINUE,
-    ND_SWITCH, ND_CASE
+    ND_SWITCH, ND_CASE,
+    ND_VA_START, ND_VA_ARG, ND_VA_END
 } NodeKind;
 
 /* Type kinds */

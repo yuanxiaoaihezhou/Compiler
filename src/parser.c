@@ -216,6 +216,43 @@ static ASTNode *primary(Token **rest, Token *tok) {
     if (tok->kind == TK_IDENT) {
         /* Function call */
         if (equal(tok->next, "(")) {
+            /* Check for va_start built-in */
+            if (tok->len == 8 && strncmp(tok->str, "va_start", 8) == 0) {
+                tok = tok->next->next; /* skip "va_start(" */
+                ASTNode *node = new_node(ND_VA_START);
+                /* va_start(ap, last_param) */
+                node->lhs = assign(&tok, tok); /* ap */
+                tok = skip(tok, ",");
+                node->rhs = assign(&tok, tok); /* last named parameter */
+                *rest = skip(tok, ")");
+                return node;
+            }
+            
+            /* Check for va_arg built-in */
+            if (tok->len == 6 && strncmp(tok->str, "va_arg", 6) == 0) {
+                tok = tok->next->next; /* skip "va_arg(" */
+                ASTNode *node = new_node(ND_VA_ARG);
+                /* va_arg(ap, type) */
+                node->lhs = assign(&tok, tok); /* ap */
+                tok = skip(tok, ",");
+                /* Parse type */
+                DeclSpec *spec = declspec(&tok, tok);
+                Type *ty = declarator(&tok, tok, spec->ty);
+                node->ty = ty;
+                *rest = skip(tok, ")");
+                return node;
+            }
+            
+            /* Check for va_end built-in */
+            if (tok->len == 6 && strncmp(tok->str, "va_end", 6) == 0) {
+                tok = tok->next->next; /* skip "va_end(" */
+                ASTNode *node = new_node(ND_VA_END);
+                /* va_end(ap) */
+                node->lhs = assign(&tok, tok); /* ap */
+                *rest = skip(tok, ")");
+                return node;
+            }
+            
             ASTNode *node = new_node(ND_CALL);
             node->funcname = strndup_custom(tok->str, tok->len);
             tok = tok->next->next;

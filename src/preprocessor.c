@@ -246,7 +246,7 @@ static void process_include(char *line, char *output, int *out_len) {
             *out_len += len;
             output[*out_len] = '\0';
         } else if (strcmp(filename, "stdarg.h") == 0 || strstr(filename, "stdarg.h")) {
-            const char *stdarg_defs = "\ntypedef int va_list;\n";
+            const char *stdarg_defs = "\ntypedef char *va_list;\n";
             int len = strlen(stdarg_defs);
             memcpy(output + *out_len, stdarg_defs, len);
             *out_len += len;
